@@ -12,8 +12,32 @@ jobs:
       - name: Descargar codigo
         uses: actions/checkout@v4
 
-      - name: Generar Proyecto Xcode
+      - name: Preparar Logo y Generar Proyecto Xcode
         run: |
+          mkdir -p Assets.xcassets/AppIcon.appiconset
+          if [ -f "icon.png" ]; then
+            sips -s format jpeg icon.png --out temp_no_alpha.jpg
+            sips -s format png -z 1024 1024 temp_no_alpha.jpg --out Assets.xcassets/AppIcon.appiconset/icon.png
+          else
+            sips -s format jpeg /System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ToolbarAdvanced.icns --out temp_no_alpha.jpg
+            sips -s format png -z 1024 1024 temp_no_alpha.jpg --out Assets.xcassets/AppIcon.appiconset/icon.png
+          fi
+          cat << 'EOF' > Assets.xcassets/AppIcon.appiconset/Contents.json
+          {
+            "images" : [
+              {
+                "filename" : "icon.png",
+                "idiom" : "universal",
+                "platform" : "ios",
+                "size" : "1024x1024"
+              }
+            ],
+            "info" : {
+              "author" : "xcode",
+              "version" : 1
+            }
+          }
+          EOF
           brew install xcodegen
           xcodegen generate
 
