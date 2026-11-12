@@ -35,9 +35,10 @@ enum FilmProfile: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - 2. Tubería de Color + Corrección Física de Orientación
+// MARK: - 2. Motor de Revelado RAW Cinematográfico (Seguro en Memoria GPU)
 class CinematicPipeline {
     static let shared = CinematicPipeline()
+    
     let ciContext = CIContext(options: [
         .workingColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
         .workingFormat: CIFormat.RGBAh,
@@ -47,15 +48,16 @@ class CinematicPipeline {
     func applyCinematicLook(to input: CIImage, profile: FilmProfile, bloomAmount: Float, isRAW: Bool) -> CIImage {
         var current = input
         let extent = current.extent
+        guard extent.width > 0, extent.height > 0 else { return input }
         
-        // 1. Compresión suave de Altas Luces (Highlight Roll-off)
+        // 1. Compresión suave de Altas Luces (Highlight Roll-off) y apertura de sombras
         let hs = CIFilter.highlightShadowAdjust()
         hs.inputImage = current
-        hs.highlightAmount = 0.42
-        hs.shadowAmount = isRAW ? 0.32 : 0.24
+        hs.highlightAmount = 0.40 // Comprime altas luces para evitar quemados
+        hs.shadowAmount = isRAW ? 0.35 : 0.24
         if let out = hs.outputImage { current = out }
         
-        // 2. Curvas y Matrices de Película
+        // 2. Curva en S y Matrices Químicas de Color
         let curve = CIFilter.toneCurve()
         curve.inputImage = current
         
@@ -64,7 +66,7 @@ class CinematicPipeline {
             curve.point0 = CGPoint(x: 0.00, y: 0.04)
             curve.point1 = CGPoint(x: 0.22, y: 0.16)
             curve.point2 = CGPoint(x: 0.50, y: 0.52)
-            curve.point3 = CGPoint(x: 0.78, y: 0.80)
+            curve.point3 = CGPoint(x: 0.78, y: 0.81)
             curve.point4 = CGPoint(x: 1.00, y: 0.91)
             if let out = curve.outputImage { current = out }
             
@@ -122,27 +124,27 @@ class CinematicPipeline {
             if let out = curve.outputImage { current = out }
         }
         
-        // 3. Halation / Bloom en altas luces
+        // 3. Halation / Bloom seguro en memoria (Radio acotado a 14px máx para evitar crash por RAM)
         if bloomAmount > 0.05 {
             let bloom = CIFilter.bloom()
-            bloom.inputImage = current
-            bloom.radius = Float(min(extent.width, extent.height) * 0.025)
-            bloom.intensity = bloomAmount * 0.65
+            bloom.inputImage = current.clampedToExtent()
+            bloom.radius = 12.0
+            bloom.intensity = bloomAmount * 0.55
             if let out = bloom.outputImage?.cropped(to: extent) {
                 current = out
             }
         }
         
-        // 4. Viñeteado suave
+        // 4. Viñeteado suave de lente fijo
         let vignette = CIFilter.vignette()
         vignette.inputImage = current
-        vignette.intensity = 0.45
+        vignette.intensity = 0.40
         vignette.radius = 1.6
         if let out = vignette.outputImage { current = out }
         
-        // 5. Grano de 35mm
+        // 5. Grano orgánico de 35mm
         if let noise = CIFilter.randomGenerator().outputImage {
-            let grainIntensity: CGFloat = isRAW ? 0.032 : 0.024
+            let grainIntensity: CGFloat = isRAW ? 0.030 : 0.022
             let monoNoise = noise.applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: 0, y: 1, z: 0, w: 0),
                 "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
@@ -155,91 +157,115 @@ class CinematicPipeline {
         return current.cropped(to: extent)
     }
     
-    /// Revela la foto y rota físicamente los píxeles según el ángulo real del iPhone al disparar
-    func developFinalPhoto(data: Data, profile: FilmProfile, bloomAmount: Float, deviceOrientation: UIDeviceOrientation) -> UIImage? {
-        var baseImage: CIImage?
-        var isRAW = false
-        
-        // Mapear el ángulo físico del iPhone a orientación EXIF estándar para rotar el sensor nativo
-        let targetExifOrientation: CGImagePropertyOrientation
-        switch deviceOrientation {
-        case .landscapeLeft:
-            targetExifOrientation = .up        // Teléfono inclinado a la izquierda (cámara arriba)
-        case .landscapeRight:
-            targetExifOrientation = .down      // Teléfono inclinado a la derecha
-        case .portraitUpsideDown:
-            targetExifOrientation = .left      // Vertical cabeza abajo
-        default:
-            targetExifOrientation = .right     // Vertical normal (90° sentido horario)
-        }
-        
-        if let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
-            rawFilter.luminanceNoiseReductionAmount = 0.75
-            rawFilter.colorNoiseReductionAmount = 0.90
-            rawFilter.sharpnessAmount = 0.05
-            rawFilter.localToneMapAmount = 0.0
-            rawFilter.boostAmount = 0.35
-            rawFilter.baselineExposure = 0.20
+    func developFinalPhoto(
+        data: Data,
+        wasCapturedAsRAW: Bool,
+        profile: FilmProfile,
+        bloomAmount: Float,
+        deviceOrientation: UIDeviceOrientation
+    ) -> (image: UIImage?, debugStatus: String) {
+        return autoreleasepool {
+            var baseImage: CIImage?
+            var usedCIRAW = false
             
-            // Si el RAW viene acostado de fábrica (ancho > alto), le aplicamos la rotación física de los píxeles
-            if var rawOut = rawFilter.outputImage {
-                if rawOut.extent.width > rawOut.extent.height {
-                    rawOut = rawOut.oriented(targetExifOrientation)
-                } else if deviceOrientation == .landscapeLeft {
-                    rawOut = rawOut.oriented(.left)
-                } else if deviceOrientation == .landscapeRight {
-                    rawOut = rawOut.oriented(.right)
+            let targetExifOrientation: CGImagePropertyOrientation
+            switch deviceOrientation {
+            case .landscapeLeft: targetExifOrientation = .up
+            case .landscapeRight: targetExifOrientation = .down
+            case .portraitUpsideDown: targetExifOrientation = .left
+            default: targetExifOrientation = .right
+            }
+            
+            // 1. Revelar con CIRAWFilter si viene en DNG/Bayer RAW directo del sensor
+            if wasCapturedAsRAW, let rawFilter = CIRAWFilter(imageData: data, identifierHint: "com.adobe.raw-image") ?? CIRAWFilter(imageData: data, identifierHint: nil) {
+                // Desactivar todo el procesado artificial de Apple (Smart HDR / Deep Fusion sharpening)
+                rawFilter.luminanceNoiseReductionAmount = 0.72
+                rawFilter.colorNoiseReductionAmount = 0.88
+                rawFilter.sharpnessAmount = 0.08 // Sin bordes duros digitales
+                rawFilter.localToneMapAmount = 0.0 // Cero efecto HDR falso
+                rawFilter.boostAmount = 0.30 // Respuesta logarítmica de cine
+                rawFilter.baselineExposure = 0.25
+                
+                // Si el sensor dispara en 48MP, escalar a 12MP (4032px) para no desbordar la RAM de iOS
+                rawFilter.scaleFactor = 1.0
+                if var rawOut = rawFilter.outputImage {
+                    if max(rawOut.extent.width, rawOut.extent.height) > 4200 {
+                        rawFilter.scaleFactor = 0.5
+                        rawOut = rawFilter.outputImage ?? rawOut
+                    }
+                    if rawOut.extent.width > rawOut.extent.height {
+                        rawOut = rawOut.oriented(targetExifOrientation)
+                    } else if deviceOrientation == .landscapeLeft {
+                        rawOut = rawOut.oriented(.left)
+                    } else if deviceOrientation == .landscapeRight {
+                        rawOut = rawOut.oriented(.right)
+                    }
+                    baseImage = rawOut
+                    usedCIRAW = true
                 }
-                baseImage = rawOut
             }
-            isRAW = true
-        } else if var std = CIImage(data: data, options: [.applyOrientationProperty: true]) {
-            if std.extent.width > std.extent.height && (deviceOrientation == .portrait || !deviceOrientation.isLandscape) {
-                std = std.oriented(.right)
+            
+            // 2. Respaldo por si se usó el lente 0.5x o zoom 2x (donde Apple no entrega Bayer RAW)
+            if baseImage == nil, var std = CIImage(data: data, options: [.applyOrientationProperty: true]) {
+                if std.extent.width > std.extent.height && !deviceOrientation.isLandscape {
+                    std = std.oriented(.right)
+                }
+                baseImage = std
             }
-            baseImage = std
+            
+            guard let input = baseImage else {
+                return (nil, "ERROR AL DECODIFICAR IMAGEN")
+            }
+            
+            let processed = applyCinematicLook(to: input, profile: profile, bloomAmount: bloomAmount, isRAW: usedCIRAW)
+            guard let cgImage = ciContext.createCGImage(processed, from: processed.extent) else {
+                return (nil, "ERROR DE MEMORIA GPU")
+            }
+            
+            let finalUIImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
+            let w = Int(processed.extent.width)
+            let h = Int(processed.extent.height)
+            let statusText = usedCIRAW
+                ? "RAW REAL REVELADO (\(w)x\(h))"
+                : "PIPELINE CINE 16-BIT (\(w)x\(h))"
+            
+            return (finalUIImage, statusText)
         }
-        
-        guard let input = baseImage else { return nil }
-        let processed = applyCinematicLook(to: input, profile: profile, bloomAmount: bloomAmount, isRAW: isRAW)
-        
-        // Al haber rotado los píxeles en CIImage, creamos un UIImage ya derecho (.up) que nunca se voltea en la galería
-        guard let cgImage = ciContext.createCGImage(processed, from: processed.extent) else { return nil }
-        return UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
     }
 }
 
-// MARK: - 3. Controlador de Cámara + Sensor de Ángulo (Acelerómetro CoreMotion)
+// MARK: - 3. Controlador de Cámara Thread-Safe + Habilitación Real de Bayer RAW
 @Observable
-class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
+class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
-    private let videoOutput = AVCaptureVideoDataOutput()
-    private let videoQueue = DispatchQueue(label: "com.chromacam.videoQueue", qos: .userInteractive)
+    private let sessionQueue = DispatchQueue(label: "com.chromacam.sessionQueue")
     private let motionManager = CMMotionManager()
     
     private var currentDevice: AVCaptureDevice?
+    private var lastExposureUpdate: Date = .distantPast
     
-    var livePreviewImage: CGImage?
     var capturedImage: UIImage?
     var isProcessing = false
     var isRAWActive = false
+    var statusMessage = "INICIANDO SENSOR..."
     var currentZoom: CGFloat = 1.0
     var selectedProfile: FilmProfile = .chromagraph
-    var exposureEV: Float = -0.5
-    var bloomIntensity: Float = 0.55
+    var exposureEV: Float = -0.45
+    var bloomIntensity: Float = 0.45
     var physicalOrientation: UIDeviceOrientation = .portrait
     
     override init() {
         super.init()
         startMotionTracking()
-        configureSession()
+        sessionQueue.async {
+            self.configureSession()
+        }
     }
     
-    /// Lee el acelerómetro real del iPhone (funciona incluso con el bloqueo de rotación activado)
     private func startMotionTracking() {
         guard motionManager.isAccelerometerAvailable else { return }
-        motionManager.accelerometerUpdateInterval = 0.2
+        motionManager.accelerometerUpdateInterval = 0.25
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self = self, let acc = data?.acceleration else { return }
             if abs(acc.y) > abs(acc.x) {
@@ -252,6 +278,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoData
     
     private func configureSession() {
         session.beginConfiguration()
+        // CLAVE: Usar .photo sin VideoDataOutput permite que el iPhone 17 base active Bayer RAW al 100%
         session.sessionPreset = .photo
         
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
@@ -261,145 +288,200 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoData
         }
         
         currentDevice = device
-        if session.canAddInput(input) { session.addInput(input) }
-        
-        videoOutput.alwaysDiscardsLateVideoFrames = true
-        videoOutput.setSampleBufferDelegate(self, queue: videoQueue)
-        if session.canAddOutput(videoOutput) {
-            session.addOutput(videoOutput)
-            if let connection = videoOutput.connection(with: .video) {
-                connection.videoRotationAngle = 90
-            }
+        if session.canAddInput(input) {
+            session.addInput(input)
         }
         
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
-            photoOutput.maxPhotoQualityPrioritization = .quality
-            isRAWActive = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
+            // En iPhone 17 base, .balanced permite simultáneamente Bayer RAW sin crashear AVFoundation
+            photoOutput.maxPhotoQualityPrioritization = .balanced
+            if photoOutput.isAppleProRAWSupported {
+                photoOutput.isAppleProRAWEnabled = true
+            }
         }
         
         session.commitConfiguration()
-        setExposure(exposureEV)
-        Task.detached { self.session.startRunning() }
+        session.startRunning()
+        
+        applyExposureInternal(exposureEV)
+        updateRAWStatusBadge()
+    }
+    
+    private func updateRAWStatusBadge() {
+        let rawFormats = photoOutput.availableRawPhotoPixelFormatTypes
+        let hasRAW = !rawFormats.isEmpty
+        DispatchQueue.main.async {
+            self.isRAWActive = hasRAW
+            self.statusMessage = hasRAW ? "SENSOR BAYER RAW ACTIVO" : "MODO LENTE SECUNDARIO (HEIC 16-BIT)"
+        }
     }
     
     func setExposure(_ ev: Float) {
         exposureEV = ev
+        // Throttling de 50ms para que deslizar el dedo rápido jamás bloquee ni crashee el hilo de cámara
+        let now = Date()
+        guard now.timeIntervalSince(lastExposureUpdate) > 0.05 else { return }
+        lastExposureUpdate = now
+        
+        sessionQueue.async {
+            self.applyExposureInternal(ev)
+        }
+    }
+    
+    private func applyExposureInternal(_ ev: Float) {
         guard let device = currentDevice else { return }
         do {
             try device.lockForConfiguration()
-            device.setExposureTargetBias(ev, completionHandler: nil)
+            let clampedEV = max(device.minExposureTargetBias, min(ev, device.maxExposureTargetBias))
+            device.setExposureTargetBias(clampedEV, completionHandler: nil)
             device.unlockForConfiguration()
         } catch {}
     }
     
     func switchCameraLens(factor: CGFloat) {
         currentZoom = factor
-        session.beginConfiguration()
-        session.inputs.forEach { session.removeInput($0) }
+        let targetEV = exposureEV
         
-        let targetType: AVCaptureDevice.DeviceType = (factor == 0.5) ? .builtInUltraWideCamera : .builtInWideAngleCamera
-        if let newDevice = AVCaptureDevice.default(targetType, for: .video, position: .back),
-           let newInput = try? AVCaptureDeviceInput(device: newDevice) {
-            currentDevice = newDevice
-            if session.canAddInput(newInput) { session.addInput(newInput) }
-        }
-        
-        if let connection = videoOutput.connection(with: .video) {
-            connection.videoRotationAngle = 90
-        }
-        
-        session.commitConfiguration()
-        isRAWActive = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
-        
-        if let device = currentDevice {
-            do {
-                try device.lockForConfiguration()
-                let zoom = (factor >= 1.0) ? factor : 1.0
-                device.videoZoomFactor = min(zoom, device.maxAvailableVideoZoomFactor)
-                device.setExposureTargetBias(exposureEV, completionHandler: nil)
-                device.unlockForConfiguration()
-            } catch {}
-        }
-    }
-    
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        var ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        
-        // Garantizar que el visor siempre esté en vertical aunque el driver entregue el buffer acostado
-        if ciImage.extent.width > ciImage.extent.height {
-            ciImage = ciImage.oriented(.right)
-        }
-        
-        let filtered = CinematicPipeline.shared.applyCinematicLook(
-            to: ciImage,
-            profile: selectedProfile,
-            bloomAmount: bloomIntensity,
-            isRAW: false
-        )
-        if let cgImg = CinematicPipeline.shared.ciContext.createCGImage(filtered, from: filtered.extent) {
-            DispatchQueue.main.async {
-                self.livePreviewImage = cgImg
+        sessionQueue.async {
+            self.session.beginConfiguration()
+            self.session.inputs.forEach { self.session.removeInput($0) }
+            
+            // NOTA TÉCNICA: Apple solo soporta Bayer RAW en el lente 1x (builtInWideAngleCamera) sin zoom digital.
+            let targetType: AVCaptureDevice.DeviceType = (factor == 0.5) ? .builtInUltraWideCamera : .builtInWideAngleCamera
+            if let newDevice = AVCaptureDevice.default(targetType, for: .video, position: .back),
+               let newInput = try? AVCaptureDeviceInput(device: newDevice) {
+                self.currentDevice = newDevice
+                if self.session.canAddInput(newInput) {
+                    self.session.addInput(newInput)
+                }
             }
+            
+            self.session.commitConfiguration()
+            
+            if let device = self.currentDevice {
+                do {
+                    try device.lockForConfiguration()
+                    // Si es 2x, aplicamos recorte óptico; si es 1x dejamos zoom 1.0 para que RAW permanezca activo
+                    let zoom = (factor > 1.0) ? factor : 1.0
+                    device.videoZoomFactor = min(zoom, device.maxAvailableVideoZoomFactor)
+                    let clampedEV = max(device.minExposureTargetBias, min(targetEV, device.maxExposureTargetBias))
+                    device.setExposureTargetBias(clampedEV, completionHandler: nil)
+                    device.unlockForConfiguration()
+                } catch {}
+            }
+            
+            self.updateRAWStatusBadge()
         }
     }
     
     func capturePhoto() {
+        guard !isProcessing else { return }
         isProcessing = true
-        let settings: AVCapturePhotoSettings
+        statusMessage = "CAPTURANDO DEL SENSOR..."
         
-        if let bayerRAW = photoOutput.availableRawPhotoPixelFormatTypes.first {
-            settings = AVCapturePhotoSettings(rawPixelFormatType: bayerRAW)
-        } else {
-            settings = AVCapturePhotoSettings()
-        }
+        let currentAngle = self.physicalOrientation
         
-        // Informar también a la conexión de captura el ángulo actual del teléfono
-        if let photoConnection = photoOutput.connection(with: .video) {
-            switch physicalOrientation {
-            case .landscapeLeft: photoConnection.videoRotationAngle = 0
-            case .landscapeRight: photoConnection.videoRotationAngle = 180
-            case .portraitUpsideDown: photoConnection.videoRotationAngle = 270
-            default: photoConnection.videoRotationAngle = 90
+        sessionQueue.async {
+            let settings: AVCapturePhotoSettings
+            
+            // CRÍTICO: En iOS, Bayer RAW solo es válido cuando el zoom es 1.0x. Si el usuario puso 2x, Apple lanza excepción si pides RAW.
+            let canCaptureRAWNow = (self.currentZoom == 1.0) && !self.photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
+            
+            if canCaptureRAWNow, let rawFormat = self.photoOutput.availableRawPhotoPixelFormatTypes.first {
+                settings = AVCapturePhotoSettings(rawPixelFormatType: rawFormat)
+                // Para evitar el crash de AVFoundation, respetamos el maxPhotoQualityPrioritization actual
+                settings.photoQualityPrioritization = self.photoOutput.maxPhotoQualityPrioritization
+            } else {
+                settings = AVCapturePhotoSettings()
+                settings.photoQualityPrioritization = self.photoOutput.maxPhotoQualityPrioritization
             }
+            
+            if let photoConnection = self.photoOutput.connection(with: .video) {
+                switch currentAngle {
+                case .landscapeLeft: photoConnection.videoRotationAngle = 0
+                case .landscapeRight: photoConnection.videoRotationAngle = 180
+                case .portraitUpsideDown: photoConnection.videoRotationAngle = 270
+                default: photoConnection.videoRotationAngle = 90
+                }
+            }
+            
+            self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
-        
-        settings.photoQualityPrioritization = .quality
-        photoOutput.capturePhoto(with: settings, delegate: self)
     }
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let data = photo.fileDataRepresentation() else {
-            isProcessing = false
+        if let error = error {
+            DispatchQueue.main.async {
+                self.statusMessage = "ERROR CAPTURA: \(error.localizedDescription)"
+                self.isProcessing = false
+            }
             return
         }
+        
+        guard let data = photo.fileDataRepresentation() else {
+            DispatchQueue.main.async {
+                self.statusMessage = "SIN DATOS DE SENSOR"
+                self.isProcessing = false
+            }
+            return
+        }
+        
+        let wasRAW = photo.isRawPhoto
         let profile = self.selectedProfile
         let bloom = self.bloomIntensity
-        let currentAngle = self.physicalOrientation
+        let angle = self.physicalOrientation
         
         Task.detached(priority: .userInitiated) {
-            let finalImage = CinematicPipeline.shared.developFinalPhoto(
+            let result = CinematicPipeline.shared.developFinalPhoto(
                 data: data,
+                wasCapturedAsRAW: wasRAW,
                 profile: profile,
                 bloomAmount: bloom,
-                deviceOrientation: currentAngle
+                deviceOrientation: angle
             )
-            if let img = finalImage {
-                UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
+            
+            if let finalImg = result.image {
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                    guard status == .authorized || status == .limited else { return }
+                    PHPhotoLibrary.shared().performChanges({
+                        PHAssetChangeRequest.creationRequestForAsset(from: finalImg)
+                    }, completionHandler: nil)
+                }
             }
+            
             await MainActor.run {
-                self.capturedImage = finalImage
+                self.capturedImage = result.image
+                self.statusMessage = result.debugStatus
                 self.isProcessing = false
             }
         }
     }
 }
 
-// MARK: - 4. Interfaz Visual Chromagraph
+// MARK: - 4. Visor Nativo Fluido + Overlay de Previsualización de Película en Tiempo Real
+struct NativeCameraPreview: UIViewRepresentable {
+    let session: AVCaptureSession
+    
+    func makeUIView(context: Context) -> UIView {
+        let view = PreviewView()
+        view.videoPreviewLayer.session = session
+        view.videoPreviewLayer.videoGravity = .resizeAspectFill
+        return view
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {}
+    
+    class PreviewView: UIView {
+        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+        var videoPreviewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    }
+}
+
 struct ContentView: View {
     @State private var camera = CameraManager()
     @State private var showControls = false
+    @State private var showFullPreview = false
     private let zoomLevels: [CGFloat] = [0.5, 1.0, 2.0]
     
     var body: some View {
@@ -407,6 +489,7 @@ struct ContentView: View {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 10) {
+                // Barra Superior con Telemetría Real de Sensor RAW
                 HStack(spacing: 8) {
                     Text(camera.selectedProfile.rawValue.uppercased())
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -416,13 +499,19 @@ struct ContentView: View {
                         .foregroundStyle(camera.selectedProfile.badgeColor)
                         .clipShape(Capsule())
                     
-                    Text(camera.isRAWActive ? "BAYER RAW 14-BIT" : "CINE PIPELINE")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.12))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .clipShape(Capsule())
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(camera.isRAWActive && camera.currentZoom == 1.0 ? Color.green : Color.orange)
+                            .frame(width: 7, height: 7)
+                        Text(camera.statusMessage)
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.12))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .clipShape(Capsule())
                     
                     Spacer()
                     
@@ -437,19 +526,18 @@ struct ContentView: View {
                             .clipShape(Circle())
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 
+                // Visor Principal con Emulación de Película en Tiempo Real y Cero Consumo de RAM
                 ZStack(alignment: .bottom) {
-                    GeometryReader { geo in
-                        if let cgImage = camera.livePreviewImage {
-                            Image(decorative: cgImage, scale: 1.0, orientation: .up)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: geo.size.width, height: geo.size.height)
-                                .clipped()
-                        } else {
-                            Color(white: 0.06)
-                        }
+                    ZStack {
+                        NativeCameraPreview(session: camera.session)
+                            .contrast(camera.selectedProfile == .triX400 ? 1.28 : 1.12)
+                            .saturation(camera.selectedProfile == .triX400 ? 0.0 : (camera.selectedProfile == .portra400 ? 1.12 : 0.92))
+                        
+                        // Tinte óptico en vivo según película seleccionada para ver el look antes de disparar
+                        filmLiveOverlay(for: camera.selectedProfile)
+                            .allowsHitTesting(false)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                     .overlay(
@@ -457,6 +545,7 @@ struct ContentView: View {
                             .stroke(Color.white.opacity(0.14), lineWidth: 1)
                     )
                     
+                    // Controles Inferiores
                     VStack(spacing: 12) {
                         if showControls {
                             VStack(spacing: 8) {
@@ -486,11 +575,12 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
-                            .background(Color.black.opacity(0.75))
+                            .background(Color.black.opacity(0.78))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                             .padding(.horizontal, 20)
                         }
                         
+                        // Selector de Película
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
                                 ForEach(FilmProfile.allCases) { profile in
@@ -517,6 +607,7 @@ struct ContentView: View {
                             .padding(.horizontal, 20)
                         }
                         
+                        // Selector de Lentes (Nota: 1x mantiene el puntito verde de RAW encendido)
                         HStack(spacing: 10) {
                             ForEach(zoomLevels, id: \.self) { level in
                                 Button {
@@ -534,18 +625,25 @@ struct ContentView: View {
                             }
                         }
                         
+                        // Barra de Disparo y Visor de Última Foto
                         HStack {
-                            if let lastPhoto = camera.capturedImage {
-                                Image(uiImage: lastPhoto)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 48, height: 48)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.3), lineWidth: 1))
-                            } else {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.white.opacity(0.15))
-                                    .frame(width: 48, height: 48)
+                            Button {
+                                if camera.capturedImage != nil {
+                                    showFullPreview = true
+                                }
+                            } label: {
+                                if let lastPhoto = camera.capturedImage {
+                                    Image(uiImage: lastPhoto)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 48, height: 48)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.4), lineWidth: 1))
+                                } else {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.white.opacity(0.15))
+                                        .frame(width: 48, height: 48)
+                                }
                             }
                             
                             Spacer()
@@ -573,6 +671,49 @@ struct ContentView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showFullPreview) {
+            if let img = camera.capturedImage {
+                ZStack(alignment: .topTrailing) {
+                    Color.black.ignoresSafeArea()
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Button("Cerrar") {
+                        showFullPreview = false
+                    }
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .padding(12)
+                    .background(Color.black.opacity(0.7))
+                    .foregroundStyle(.white)
+                    .clipShape(Capsule())
+                    .padding(20)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func filmLiveOverlay(for profile: FilmProfile) -> some View {
+        switch profile {
+        case .chromagraph:
+            LinearGradient(
+                colors: [Color(red: 1.0, green: 0.85, blue: 0.55).opacity(0.08), Color(red: 0.1, green: 0.35, blue: 0.45).opacity(0.10)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .blendMode(.softLight)
+        case .portra400:
+            Color(red: 1.0, green: 0.68, blue: 0.35)
+                .opacity(0.12)
+                .blendMode(.overlay)
+        case .cinestill800T:
+            Color(red: 0.15, green: 0.65, blue: 0.95)
+                .opacity(0.14)
+                .blendMode(.colorBurn)
+        case .triX400:
+            Color.clear
         }
     }
 }
