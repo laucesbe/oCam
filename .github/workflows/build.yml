@@ -1,4 +1,4 @@
-name: Crear IPA para iPhone
+name: Crear IPA oCam
 
 on:
   push:
@@ -41,10 +41,10 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
-      - name: Compilar App sin firma (para Sideloadly)
+      - name: Compilar oCam sin firma
         run: |
-          xcodebuild -project ChromaCam.xcodeproj \
-            -scheme ChromaCam \
+          xcodebuild -project oCam.xcodeproj \
+            -scheme oCam \
             -configuration Release \
             -derivedDataPath build \
             -sdk iphoneos \
@@ -52,14 +52,14 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Empaquetar archivo .ipa
+      - name: Empaquetar archivo oCam.ipa
         run: |
           mkdir -p Payload
-          cp -r build/Build/Products/Release-iphoneos/ChromaCam.app Payload/
-          zip -r ChromaCam.ipa Payload
+          cp -r build/Build/Products/Release-iphoneos/oCam.app Payload/
+          zip -r oCam.ipa Payload
 
       - name: Subir archivo IPA listo para descargar
         uses: actions/upload-artifact@v4
         with:
-          name: ChromaCam-IPA
-          path: ChromaCam.ipa
+          name: oCam-IPA
+          path: oCam.ipa
