@@ -20,5 +20,6 @@ targets:
         UILaunchScreen: {}
         NSCameraUsageDescription: "Acceso directo al sensor RAW para revelado cinematográfico."
         NSPhotoLibraryAddUsageDescription: "Guardar tus fotos reveladas en el carrete."
+        NSPhotoLibraryUsageDescription: "Guardar y verificar fotos RAW reveladas en tu galería."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
