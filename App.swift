@@ -41,79 +41,94 @@ struct DevelopedPhotoResult {
     let status: String
 }
 
-// MARK: - 2. Motor de Revelado RAW Cinematográfico
+// MARK: - 2. Motor de Revelado Cinematográfico (Optimizado para 48MP y 12MP RAW)
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
+    // Usamos RGBA8 sin caché intermedio para poder renderizar lienzos gigantes de 48MP (8064x6048) sin agotar la RAM
     private let ciContext = CIContext(options: [
         .workingColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
-        .workingFormat: CIFormat.RGBAh,
-        .cacheIntermediates: false
+        .workingFormat: CIFormat.RGBA8,
+        .cacheIntermediates: false,
+        .priorityRequestLow: false
     ])
     
-    func applyCinematicLook(to input: CIImage, profile: FilmProfile, bloomAmount: Float, isRAW: Bool) -> CIImage {
+    func applyCinematicLook(to input: CIImage, profile: FilmProfile, bloomAmount: Float, isRAW: Bool, is48MP: Bool) -> CIImage {
         var current = input
         let extent = current.extent
         guard extent.width > 0, extent.height > 0 else { return input }
         
+        // 1. Si viene de Bayer RAW, neutralizar la matriz RGGB (exceso de verde del sensor)
+        if isRAW {
+            let wbFix = CIFilter.temperatureAndTint()
+            wbFix.inputImage = current
+            wbFix.neutral = CIVector(x: 6200, y: 0)
+            wbFix.targetNeutral = CIVector(x: 5750, y: 20)
+            if let out = wbFix.outputImage?.cropped(to: extent) {
+                current = out
+            }
+        }
+        
+        // 2. Compresión suave de Altas Luces (Highlight Roll-off)
         let hs = CIFilter.highlightShadowAdjust()
         hs.inputImage = current
-        hs.highlightAmount = 0.38
-        hs.shadowAmount = isRAW ? 0.36 : 0.25
+        hs.highlightAmount = isRAW ? 0.25 : 0.36
+        hs.shadowAmount = isRAW ? 0.42 : 0.25
         if let out = hs.outputImage?.cropped(to: extent) {
             current = out
         }
         
+        // 3. Curvas de Cine y Matrices de Color
         let curve = CIFilter.toneCurve()
         curve.inputImage = current
         
         switch profile {
         case .chromagraph:
-            curve.point0 = CGPoint(x: 0.00, y: 0.04)
-            curve.point1 = CGPoint(x: 0.22, y: 0.16)
-            curve.point2 = CGPoint(x: 0.50, y: 0.52)
-            curve.point3 = CGPoint(x: 0.78, y: 0.81)
-            curve.point4 = CGPoint(x: 1.00, y: 0.91)
+            curve.point0 = CGPoint(x: 0.00, y: 0.03)
+            curve.point1 = CGPoint(x: 0.24, y: 0.19)
+            curve.point2 = CGPoint(x: 0.50, y: 0.51)
+            curve.point3 = CGPoint(x: 0.76, y: 0.79)
+            curve.point4 = CGPoint(x: 1.00, y: 0.92)
             if let out = curve.outputImage?.cropped(to: extent) { current = out }
             
             let matrix = CIFilter.colorMatrix()
             matrix.inputImage = current
-            matrix.rVector = CIVector(x: 1.08, y: 0.02, z: -0.02, w: 0)
-            matrix.gVector = CIVector(x: 0.00, y: 1.02, z: 0.01, w: 0)
-            matrix.bVector = CIVector(x: -0.04, y: 0.02, z: 0.92, w: 0)
-            matrix.biasVector = CIVector(x: -0.01, y: 0.00, z: 0.015, w: 0)
+            matrix.rVector = CIVector(x: 1.06, y: 0.01, z: -0.01, w: 0)
+            matrix.gVector = CIVector(x: 0.00, y: 0.99, z: 0.00, w: 0)
+            matrix.bVector = CIVector(x: -0.02, y: 0.01, z: 0.95, w: 0)
+            matrix.biasVector = CIVector(x: 0.005, y: -0.005, z: 0.00, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .portra400:
-            curve.point0 = CGPoint(x: 0.00, y: 0.06)
+            curve.point0 = CGPoint(x: 0.00, y: 0.05)
             curve.point1 = CGPoint(x: 0.25, y: 0.22)
-            curve.point2 = CGPoint(x: 0.50, y: 0.55)
-            curve.point3 = CGPoint(x: 0.75, y: 0.82)
-            curve.point4 = CGPoint(x: 1.00, y: 0.93)
-            if let out = curve.outputImage?.cropped(to: extent) { current = out }
-            
-            let matrix = CIFilter.colorMatrix()
-            matrix.inputImage = current
-            matrix.rVector = CIVector(x: 1.14, y: 0.03, z: -0.03, w: 0)
-            matrix.gVector = CIVector(x: 0.02, y: 1.03, z: -0.02, w: 0)
-            matrix.bVector = CIVector(x: -0.05, y: -0.02, z: 0.88, w: 0)
-            matrix.biasVector = CIVector(x: 0.01, y: 0.005, z: -0.01, w: 0)
-            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
-            
-        case .cinestill800T:
-            curve.point0 = CGPoint(x: 0.00, y: 0.03)
-            curve.point1 = CGPoint(x: 0.25, y: 0.15)
-            curve.point2 = CGPoint(x: 0.50, y: 0.48)
+            curve.point2 = CGPoint(x: 0.50, y: 0.54)
             curve.point3 = CGPoint(x: 0.75, y: 0.81)
             curve.point4 = CGPoint(x: 1.00, y: 0.94)
             if let out = curve.outputImage?.cropped(to: extent) { current = out }
             
             let matrix = CIFilter.colorMatrix()
             matrix.inputImage = current
-            matrix.rVector = CIVector(x: 0.92, y: 0.02, z: 0.00, w: 0)
-            matrix.gVector = CIVector(x: 0.00, y: 1.04, z: 0.04, w: 0)
-            matrix.bVector = CIVector(x: -0.02, y: 0.06, z: 1.15, w: 0)
-            matrix.biasVector = CIVector(x: -0.015, y: 0.01, z: 0.025, w: 0)
+            matrix.rVector = CIVector(x: 1.12, y: 0.02, z: -0.02, w: 0)
+            matrix.gVector = CIVector(x: 0.01, y: 1.00, z: -0.01, w: 0)
+            matrix.bVector = CIVector(x: -0.04, y: -0.01, z: 0.90, w: 0)
+            matrix.biasVector = CIVector(x: 0.01, y: -0.004, z: -0.008, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
+            
+        case .cinestill800T:
+            curve.point0 = CGPoint(x: 0.00, y: 0.03)
+            curve.point1 = CGPoint(x: 0.25, y: 0.17)
+            curve.point2 = CGPoint(x: 0.50, y: 0.49)
+            curve.point3 = CGPoint(x: 0.75, y: 0.80)
+            curve.point4 = CGPoint(x: 1.00, y: 0.94)
+            if let out = curve.outputImage?.cropped(to: extent) { current = out }
+            
+            let matrix = CIFilter.colorMatrix()
+            matrix.inputImage = current
+            matrix.rVector = CIVector(x: 0.95, y: 0.00, z: 0.00, w: 0)
+            matrix.gVector = CIVector(x: 0.00, y: 0.99, z: 0.03, w: 0)
+            matrix.bVector = CIVector(x: -0.02, y: 0.04, z: 1.12, w: 0)
+            matrix.biasVector = CIVector(x: -0.01, y: 0.00, z: 0.02, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .triX400:
@@ -130,24 +145,27 @@ class CinematicPipeline {
             if let out = curve.outputImage?.cropped(to: extent) { current = out }
         }
         
-        if bloomAmount > 0.05 {
+        // 4. Halation / Bloom (Solo en 12MP para proteger el límite de RAM de iOS en 48MP)
+        if !is48MP && bloomAmount > 0.05 {
             let bloom = CIFilter.bloom()
             bloom.inputImage = current.clampedToExtent()
-            bloom.radius = 10.0
-            bloom.intensity = bloomAmount * 0.50
+            bloom.radius = 11.0
+            bloom.intensity = bloomAmount * 0.42
             if let out = bloom.outputImage?.cropped(to: extent) {
                 current = out
             }
         }
         
+        // 5. Viñeteado óptico sutil
         let vignette = CIFilter.vignette()
         vignette.inputImage = current
-        vignette.intensity = 0.38
-        vignette.radius = 1.6
+        vignette.intensity = 0.26
+        vignette.radius = 1.8
         if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         
+        // 6. Grano orgánico de 35mm
         if let noise = CIFilter.randomGenerator().outputImage {
-            let grainIntensity: CGFloat = isRAW ? 0.028 : 0.022
+            let grainIntensity: CGFloat = 0.016
             let monoNoise = noise.applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: 0, y: 1, z: 0, w: 0),
                 "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
@@ -179,13 +197,13 @@ class CinematicPipeline {
         }
         
         if wasCapturedAsRAW, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
-            rawFilter.luminanceNoiseReductionAmount = 0.72
-            rawFilter.colorNoiseReductionAmount = 0.88
-            rawFilter.sharpnessAmount = 0.08
-            rawFilter.localToneMapAmount = 0.0
-            rawFilter.boostAmount = 0.30
-            rawFilter.baselineExposure = 0.25
-            rawFilter.scaleFactor = 0.5
+            rawFilter.luminanceNoiseReductionAmount = 0.78
+            rawFilter.colorNoiseReductionAmount = 0.92
+            rawFilter.sharpnessAmount = 0.18
+            rawFilter.localToneMapAmount = 0.15
+            rawFilter.boostAmount = 0.45
+            rawFilter.baselineExposure = -0.35
+            rawFilter.scaleFactor = 1.0
             
             if var rawOut = rawFilter.outputImage {
                 if rawOut.extent.width > rawOut.extent.height {
@@ -204,11 +222,6 @@ class CinematicPipeline {
             if std.extent.width > std.extent.height && !deviceOrientation.isLandscape {
                 std = std.oriented(.right)
             }
-            let maxDim = max(std.extent.width, std.extent.height)
-            if maxDim > 3500 {
-                let scale = 3024.0 / maxDim
-                std = std.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-            }
             baseImage = std
         }
         
@@ -217,23 +230,29 @@ class CinematicPipeline {
         }
         
         let normalizedInput = input.transformed(by: CGAffineTransform(translationX: -input.extent.origin.x, y: -input.extent.origin.y))
-        let processed = applyCinematicLook(to: normalizedInput, profile: profile, bloomAmount: bloomAmount, isRAW: usedCIRAW)
+        let maxSide = max(normalizedInput.extent.width, normalizedInput.extent.height)
+        let is48MP = maxSide > 5000
+        
+        let processed = applyCinematicLook(to: normalizedInput, profile: profile, bloomAmount: bloomAmount, isRAW: usedCIRAW, is48MP: is48MP)
         
         guard let cgImage = ciContext.createCGImage(processed, from: processed.extent) else {
             return DevelopedPhotoResult(jpegData: nil, previewImage: nil, status: "ERROR RENDER GPU")
         }
         
         let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
-        guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else {
+        guard let jpegData = uiImage.jpegData(compressionQuality: 0.96) else {
             return DevelopedPhotoResult(jpegData: nil, previewImage: uiImage, status: "ERROR JPEG")
         }
         
-        let statusText = usedCIRAW ? "RAW GUARDADO EN FOTOS" : "CINE 16-BIT GUARDADO"
+        let w = Int(processed.extent.width)
+        let h = Int(processed.extent.height)
+        let mp = Int(round((Double(w) * Double(h)) / 1_000_000.0))
+        let statusText = usedCIRAW ? "RAW \(mp)MP (\(w)x\(h))" : "CINE \(mp)MP (\(w)x\(h))"
         return DevelopedPhotoResult(jpegData: jpegData, previewImage: uiImage, status: statusText)
     }
 }
 
-// MARK: - 3. Controlador de Cámara Blindado Contra Crashes de AVFoundation
+// MARK: - 3. Controlador de Cámara con Desbloqueo de Formato 48MP (8064x6048) + 12MP Bayer RAW
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     let session = AVCaptureSession()
@@ -243,16 +262,20 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     
     private var currentDevice: AVCaptureDevice?
     private var lastExposureUpdate: Date = .distantPast
+    private var max12MPDimension = CMVideoDimensions(width: 4032, height: 3024)
+    private var max48MPDimension: CMVideoDimensions?
     
     var capturedImage: UIImage?
     var isProcessing = false
     var isRAWActive = false
-    var useRAWCapture = true
+    var is48MPSupported = false
+    var use48MPMode = true // Por defecto intenta activar los 48MP reales
+    var useRAWCapture = false
     var statusMessage = "INICIANDO..."
     var currentZoom: CGFloat = 1.0
     var selectedProfile: FilmProfile = .chromagraph
     var exposureEV: Float = -0.45
-    var bloomIntensity: Float = 0.45
+    var bloomIntensity: Float = 0.40
     var physicalOrientation: UIDeviceOrientation = .portrait
     
     override init() {
@@ -277,6 +300,50 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         }
     }
     
+    /// Busca y activa en el hardware del iPhone 17 el formato que habilita tanto 48MP (8064x6048) como Bayer RAW
+    private func unlockBestSensorFormat(for device: AVCaptureDevice) {
+        var bestFormat48MP: AVCaptureDevice.Format?
+        var found48MPDim: CMVideoDimensions?
+        var best12MPDim = CMVideoDimensions(width: 4032, height: 3024)
+        
+        for format in device.formats {
+            let dims = format.supportedMaxPhotoDimensions
+            if let d12 = dims.first(where: { $0.width >= 4000 && $0.width <= 4200 }) {
+                best12MPDim = d12
+            }
+            if let d48 = dims.first(where: { $0.width >= 8000 }) {
+                // Preferir un formato que soporte 48MP y también Bayer RAW
+                if bestFormat48MP == nil || !format.supportedRawPhotoPixelFormatTypes.isEmpty {
+                    bestFormat48MP = format
+                    found48MPDim = d48
+                }
+            }
+        }
+        
+        self.max12MPDimension = best12MPDim
+        self.max48MPDimension = found48MPDim
+        
+        if let format48 = bestFormat48MP, let d48 = found48MPDim {
+            do {
+                try device.lockForConfiguration()
+                device.activeFormat = format48
+                device.unlockForConfiguration()
+                self.photoOutput.maxPhotoDimensions = d48
+            } catch {}
+        } else if let fallbackDim = device.activeFormat.supportedMaxPhotoDimensions.last {
+            self.photoOutput.maxPhotoDimensions = fallbackDim
+        }
+        
+        let supports48 = (found48MPDim != nil)
+        DispatchQueue.main.async {
+            self.is48MPSupported = supports48
+            if !supports48 {
+                self.use48MPMode = false
+                self.useRAWCapture = true
+            }
+        }
+    }
+    
     private func configureSession() {
         session.beginConfiguration()
         session.sessionPreset = .photo
@@ -297,20 +364,48 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             photoOutput.maxPhotoQualityPrioritization = .speed
         }
         
+        unlockBestSensorFormat(for: device)
+        
         session.commitConfiguration()
         session.startRunning()
         
         applyExposureInternal(exposureEV)
-        updateRAWStatusBadge()
+        updateStatusBadge()
     }
     
-    private func updateRAWStatusBadge() {
+    func toggleSensorMode() {
+        if use48MPMode {
+            // Pasar de 48MP Cine -> 12MP Bayer RAW
+            use48MPMode = false
+            useRAWCapture = true
+        } else if useRAWCapture {
+            // Pasar de 12MP Bayer RAW -> 12MP Cine Rápido
+            useRAWCapture = false
+        } else {
+            // Volver a 48MP Cine (si el lente 1x lo soporta)
+            if is48MPSupported && currentZoom == 1.0 {
+                use48MPMode = true
+                useRAWCapture = false
+            } else {
+                useRAWCapture = true
+            }
+        }
+        updateStatusBadge()
+    }
+    
+    private func updateStatusBadge() {
         let hasRAW = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
         DispatchQueue.main.async {
             self.isRAWActive = hasRAW
-            self.statusMessage = (hasRAW && self.useRAWCapture && self.currentZoom == 1.0)
-                ? "BAYER RAW ACTIVO"
-                : "PIPELINE CINE ACTIVO"
+            if self.currentZoom != 1.0 {
+                self.statusMessage = "LENTE \(self.currentZoom == 0.5 ? "0.5x" : "2x") (12MP)"
+            } else if self.use48MPMode && self.is48MPSupported {
+                self.statusMessage = "SENSOR 48MP (8064x6048) LISTO"
+            } else if self.useRAWCapture && hasRAW {
+                self.statusMessage = "BAYER RAW 12MP LISTO"
+            } else {
+                self.statusMessage = "CINE 12MP LISTO"
+            }
         }
     }
     
@@ -350,6 +445,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 if self.session.canAddInput(newInput) {
                     self.session.addInput(newInput)
                 }
+                if factor == 1.0 {
+                    self.unlockBestSensorFormat(for: newDevice)
+                } else if let maxDim = newDevice.activeFormat.supportedMaxPhotoDimensions.last {
+                    self.photoOutput.maxPhotoDimensions = maxDim
+                }
             }
             
             self.session.commitConfiguration()
@@ -365,17 +465,17 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 } catch {}
             }
             
-            self.updateRAWStatusBadge()
+            self.updateStatusBadge()
         }
     }
     
     func capturePhoto() {
         guard !isProcessing else { return }
         isProcessing = true
-        statusMessage = "PROCESANDO..."
         
-        let wantRAW = self.useRAWCapture
-        let zoom = self.currentZoom
+        let want48MP = self.use48MPMode && self.is48MPSupported && (self.currentZoom == 1.0)
+        let wantRAW = self.useRAWCapture && !want48MP && (self.currentZoom == 1.0)
+        statusMessage = want48MP ? "REVELANDO 48MP..." : "REVELANDO 12MP..."
         
         sessionQueue.async {
             guard let connection = self.photoOutput.connection(with: .video), connection.isEnabled, connection.isActive else {
@@ -391,9 +491,15 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 AVCapturePhotoOutput.isBayerRAWPixelFormat($0)
             }
             
-            if wantRAW, zoom == 1.0, let rawFormat = bayerFormats.first ?? self.photoOutput.availableRawPhotoPixelFormatTypes.first {
-                settings = AVCapturePhotoSettings(rawPixelFormatType: rawFormat)
+            if wantRAW, let rawFormat = bayerFormats.first ?? self.photoOutput.availableRawPhotoPixelFormatTypes.first {
+                let processedCodec = self.photoOutput.availablePhotoCodecTypes.contains(.hevc) ? AVVideoCodecType.hevc : AVVideoCodecType.jpeg
+                settings = AVCapturePhotoSettings(
+                    rawPixelFormatType: rawFormat,
+                    processedFormat: [AVVideoCodecKey: processedCodec]
+                )
                 settings.photoQualityPrioritization = .speed
+                // Apple exige que Bayer RAW en modelos no-Pro se dispare en 12MP (4032x3024)
+                settings.maxPhotoDimensions = self.max12MPDimension
             } else {
                 if self.photoOutput.availablePhotoCodecTypes.contains(.hevc) {
                     settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
@@ -401,6 +507,13 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                     settings = AVCapturePhotoSettings()
                 }
                 settings.photoQualityPrioritization = .speed
+                
+                if want48MP, let d48 = self.max48MPDimension {
+                    self.photoOutput.maxPhotoDimensions = d48
+                    settings.maxPhotoDimensions = d48
+                } else {
+                    settings.maxPhotoDimensions = self.max12MPDimension
+                }
             }
             
             self.photoOutput.capturePhoto(with: settings, delegate: self)
@@ -410,10 +523,16 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         if let error = error {
             DispatchQueue.main.async {
+                self.use48MPMode = false
                 self.useRAWCapture = false
-                self.statusMessage = "MODO CINE (\(error.localizedDescription.prefix(12)))"
+                self.statusMessage = "MODO 12MP (\(error.localizedDescription.prefix(12)))"
                 self.isProcessing = false
             }
+            return
+        }
+        
+        // Si disparamos en modo 12MP RAW, ignorar el archivo HEVC acompañante para no duplicar la foto
+        if self.useRAWCapture && !self.use48MPMode && self.currentZoom == 1.0 && !photo.isRawPhoto && !self.photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
             return
         }
         
@@ -490,6 +609,13 @@ struct ContentView: View {
     @State private var showFullPreview = false
     private let zoomLevels: [CGFloat] = [0.5, 1.0, 2.0]
     
+    private var modeButtonTitle: String {
+        if camera.currentZoom != 1.0 { return "12MP" }
+        if camera.use48MPMode && camera.is48MPSupported { return "48MP CINE" }
+        if camera.useRAWCapture { return "12MP RAW" }
+        return "12MP CINE"
+    }
+    
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -497,14 +623,14 @@ struct ContentView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 8) {
                     Button {
-                        camera.useRAWCapture.toggle()
+                        camera.toggleSensorMode()
                     } label: {
-                        Text(camera.useRAWCapture && camera.currentZoom == 1.0 ? "RAW: ON" : "RAW: OFF")
+                        Text(modeButtonTitle)
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .padding(.horizontal, 9)
+                            .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(camera.useRAWCapture && camera.currentZoom == 1.0 ? camera.selectedProfile.badgeColor : Color.white.opacity(0.15))
-                            .foregroundStyle(camera.useRAWCapture && camera.currentZoom == 1.0 ? .black : .white)
+                            .background(camera.selectedProfile.badgeColor)
+                            .foregroundStyle(.black)
                             .clipShape(Capsule())
                     }
                     
