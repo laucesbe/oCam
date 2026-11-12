@@ -67,18 +67,55 @@ enum FilmProfile: String, CaseIterable, Identifiable {
         case .triX400: return Color(white: 0.88)
         }
     }
+    
+    // Configuraciones recomendadas de fábrica para cada perfil en particular
+    struct RecommendedSettings {
+        let ev: Float
+        let warmth: Float
+        let bloom: Float
+        let grain: Float
+        let vignette: Float
+    }
+    
+    var recommended: RecommendedSettings {
+        switch self {
+        case .chromagraph: return RecommendedSettings(ev: -0.35, warmth: 0.0, bloom: 0.35, grain: 0.30, vignette: 0.30)
+        case .portra400: return RecommendedSettings(ev: -0.20, warmth: 0.25, bloom: 0.40, grain: 0.25, vignette: 0.25)
+        case .cinestill800T: return RecommendedSettings(ev: -0.50, warmth: -0.30, bloom: 0.75, grain: 0.45, vignette: 0.40)
+        case .dispo98: return RecommendedSettings(ev: -0.10, warmth: 0.15, bloom: 0.50, grain: 0.65, vignette: 0.50)
+        case .ccd2004: return RecommendedSettings(ev: -0.30, warmth: -0.10, bloom: 0.20, grain: 0.40, vignette: 0.35)
+        case .polaroid600: return RecommendedSettings(ev: 0.10, warmth: 0.35, bloom: 0.60, grain: 0.35, vignette: 0.45)
+        case .superia400: return RecommendedSettings(ev: -0.30, warmth: 0.0, bloom: 0.30, grain: 0.35, vignette: 0.30)
+        case .velvia50: return RecommendedSettings(ev: -0.40, warmth: -0.10, bloom: 0.25, grain: 0.20, vignette: 0.35)
+        case .gold200: return RecommendedSettings(ev: -0.25, warmth: 0.30, bloom: 0.45, grain: 0.30, vignette: 0.30)
+        case .ektachrome: return RecommendedSettings(ev: -0.35, warmth: -0.15, bloom: 0.20, grain: 0.15, vignette: 0.30)
+        case .bleachBypass: return RecommendedSettings(ev: -0.45, warmth: -0.20, bloom: 0.10, grain: 0.50, vignette: 0.60)
+        case .triX400: return RecommendedSettings(ev: -0.35, warmth: 0.0, bloom: 0.20, grain: 0.70, vignette: 0.50)
+        }
+    }
 }
 
 enum AspectRatioOption: String, CaseIterable {
     case fourThree = "4:3"
     case oneOne = "1:1"
     case sixteenNine = "16:9"
+    case anamorphic = "2.39:1"
 }
 
 enum FrameStyleOption: String, CaseIterable {
     case none = "Sin Marco"
-    case polaroidWhite = "Blanco"
+    case polaroidWhite = "Polaroid"
     case filmBlack = "Cine Negro"
+    case filmPerforated = "35mm Perforado"
+}
+
+enum ShutterSpeedOption: String, CaseIterable {
+    case auto = "AUTO"
+    case s1_2000 = "1/2000"
+    case s1_500 = "1/500"
+    case s1_125 = "1/125"
+    case s1_30 = "1/30"
+    case s1_8 = "1/8"
 }
 
 struct DevelopedPhotoResult {
@@ -87,7 +124,7 @@ struct DevelopedPhotoResult {
     let status: String
 }
 
-// MARK: - 2. Motor de Revelado Cinematográfico + Efectos Ópticos Retro
+// MARK: - 2. Motor de Revelado Cinematográfico + Óptica Avanzada
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
@@ -107,6 +144,7 @@ class CinematicPipeline {
         warmthAdjust: Float = 0.0,
         exposureAdjust: Float = 0.0,
         lightLeakEnabled: Bool = false,
+        anamorphicMode: Bool = false,
         isRAW: Bool,
         is48MP: Bool
     ) -> CIImage {
@@ -114,7 +152,6 @@ class CinematicPipeline {
         let extent = current.extent
         guard extent.width > 0, extent.height > 0 else { return input }
         
-        // 0. Ajuste de Exposición
         if abs(exposureAdjust) > 0.02 {
             let exp = CIFilter.exposureAdjust()
             exp.inputImage = current
@@ -122,26 +159,23 @@ class CinematicPipeline {
             if let out = exp.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 1. Neutralizar dominante verde RGGB en RAW + Ajuste manual de Calidez (WB)
         if isRAW || abs(warmthAdjust) > 0.02 {
             let wbFix = CIFilter.temperatureAndTint()
             wbFix.inputImage = current
             wbFix.neutral = CIVector(x: 6200, y: 0)
             let baseTemp: CGFloat = isRAW ? 5750 : 6200
-            let tempShift = CGFloat(-warmthAdjust * 1400) // Más cálido reduce targetNeutral
+            let tempShift = CGFloat(-warmthAdjust * 1400)
             let tintShift: CGFloat = isRAW ? 20 : 0
             wbFix.targetNeutral = CIVector(x: baseTemp + tempShift, y: tintShift)
             if let out = wbFix.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 2. Compresión suave de Altas Luces (Highlight Roll-off)
         let hs = CIFilter.highlightShadowAdjust()
         hs.inputImage = current
         hs.highlightAmount = isRAW ? 0.25 : 0.36
         hs.shadowAmount = isRAW ? 0.42 : 0.25
         if let out = hs.outputImage?.cropped(to: extent) { current = out }
         
-        // 3. Curvas de Cine y Matrices de las 12 Cámaras
         let curve = CIFilter.toneCurve()
         curve.inputImage = current
         
@@ -195,7 +229,6 @@ class CinematicPipeline {
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .dispo98:
-            // Cámara desechable años 90: negros lavados verdosos, altas luces cálidas, contraste punchy
             curve.point0 = CGPoint(x: 0.00, y: 0.08)
             curve.point1 = CGPoint(x: 0.25, y: 0.20)
             curve.point2 = CGPoint(x: 0.50, y: 0.53)
@@ -212,7 +245,6 @@ class CinematicPipeline {
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .ccd2004:
-            // Digicam Y2K: contraste digital marcado y saturación vibrante fría/magenta
             let controls = CIFilter.colorControls()
             controls.inputImage = current
             controls.saturation = 1.22
@@ -227,7 +259,6 @@ class CinematicPipeline {
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .polaroid600:
-            // Película instantánea: negros mate suaves, tonos crema/melocotón
             curve.point0 = CGPoint(x: 0.00, y: 0.09)
             curve.point1 = CGPoint(x: 0.25, y: 0.25)
             curve.point2 = CGPoint(x: 0.50, y: 0.54)
@@ -244,7 +275,6 @@ class CinematicPipeline {
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .superia400:
-            // Fuji Superia 400: Verdes esmeralda ricos y sombras ligeramente magenta
             curve.point0 = CGPoint(x: 0.00, y: 0.04)
             curve.point1 = CGPoint(x: 0.25, y: 0.20)
             curve.point2 = CGPoint(x: 0.50, y: 0.52)
@@ -333,16 +363,16 @@ class CinematicPipeline {
             if let out = curve.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 4. Halation / Bloom
+        // 4. Halation / Bloom rojo/naranja tipo CineStill
         if !is48MP && bloomAmount > 0.05 {
             let bloom = CIFilter.bloom()
             bloom.inputImage = current.clampedToExtent()
             bloom.radius = 12.0
-            bloom.intensity = bloomAmount * 0.55
+            bloom.intensity = bloomAmount * 0.60
             if let out = bloom.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 5. Viñeteado óptico regulable (Más potente para que se note claramente)
+        // 5. Viñeteado óptico
         if vignetteAmount > 0.02 {
             let vignette = CIFilter.vignette()
             vignette.inputImage = current
@@ -351,7 +381,7 @@ class CinematicPipeline {
             if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 6. Fuga de Luz Analógica (Light Leak en el borde izquierdo/superior)
+        // 6. Fuga de luz analógica
         if lightLeakEnabled {
             let grad = CIFilter.linearGradient()
             grad.point0 = CGPoint(x: 0, y: extent.height * 0.85)
@@ -366,7 +396,22 @@ class CinematicPipeline {
             }
         }
         
-        // 7. Grano orgánico de 35mm regulable
+        // 7. Lente Anamórfico (Destello azulado horizontal y compresión de cinemática)
+        if anamorphicMode {
+            let flare = CIFilter.linearGradient()
+            flare.point0 = CGPoint(x: extent.width * 0.1, y: extent.height * 0.5)
+            flare.point1 = CGPoint(x: extent.width * 0.9, y: extent.height * 0.5)
+            flare.color0 = CIColor(red: 0.1, green: 0.5, blue: 1.0, alpha: 0.0)
+            flare.color1 = CIColor(red: 0.3, green: 0.7, blue: 1.0, alpha: 0.28)
+            if let flareImg = flare.outputImage?.cropped(to: extent) {
+                let add = CIFilter.additionCompositing()
+                add.inputImage = flareImg
+                add.backgroundImage = current
+                if let out = add.outputImage?.cropped(to: extent) { current = out }
+            }
+        }
+        
+        // 8. Grano 35mm
         if grainAmount > 0.02, let noise = CIFilter.randomGenerator().outputImage {
             let grainAlpha = CGFloat(grainAmount * 0.075)
             let monoNoise = noise.applyingFilter("CIColorMatrix", parameters: [
@@ -381,7 +426,6 @@ class CinematicPipeline {
         return current
     }
     
-    /// Aplica recorte de formato (4:3, 1:1, 16:9), marco analógico y fechador retro de cuarzo ('26 11 12)
     func applyFinalTouches(
         to image: UIImage,
         aspectRatio: AspectRatioOption,
@@ -392,12 +436,12 @@ class CinematicPipeline {
         let origH = image.size.height
         let isLandscape = origW > origH
         
-        // 1. Calcular recorte según formato elegido
         var targetRatio: CGFloat = 3.0 / 4.0
         switch aspectRatio {
         case .fourThree: targetRatio = isLandscape ? (4.0 / 3.0) : (3.0 / 4.0)
         case .oneOne: targetRatio = 1.0
         case .sixteenNine: targetRatio = isLandscape ? (16.0 / 9.0) : (9.0 / 16.0)
+        case .anamorphic: targetRatio = isLandscape ? (2.39 / 1.0) : (1.0 / 2.39)
         }
         
         var cropW = origW
@@ -410,7 +454,7 @@ class CinematicPipeline {
         let cropX = (origW - cropW) / 2.0
         let cropY = (origH - cropH) / 2.0
         
-        let borderSide: CGFloat = (frameStyle == .none) ? 0 : (min(cropW, cropH) * 0.048)
+        let borderSide: CGFloat = (frameStyle == .none) ? 0 : (min(cropW, cropH) * (frameStyle == .filmPerforated ? 0.08 : 0.048))
         let borderBottom: CGFloat = (frameStyle == .polaroidWhite) ? (min(cropW, cropH) * 0.14) : borderSide
         let canvasW = cropW + (borderSide * 2)
         let canvasH = cropH + borderSide + borderBottom
@@ -420,23 +464,34 @@ class CinematicPipeline {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: canvasW, height: canvasH), format: format)
         
         return renderer.image { ctx in
-            // Fondo de marco
             if frameStyle == .polaroidWhite {
                 UIColor(red: 0.97, green: 0.96, blue: 0.93, alpha: 1.0).setFill()
                 ctx.fill(CGRect(x: 0, y: 0, width: canvasW, height: canvasH))
-            } else if frameStyle == .filmBlack {
-                UIColor(white: 0.05, alpha: 1.0).setFill()
+            } else if frameStyle == .filmBlack || frameStyle == .filmPerforated {
+                UIColor(white: 0.04, alpha: 1.0).setFill()
                 ctx.fill(CGRect(x: 0, y: 0, width: canvasW, height: canvasH))
+                
+                // Perforaciones de celuloide lateral estilo 35mm
+                if frameStyle == .filmPerforated {
+                    UIColor(white: 0.18, alpha: 1.0).setFill()
+                    let perfW = borderSide * 0.5
+                    let perfH = borderSide * 0.75
+                    let perfX = (borderSide - perfW) / 2.0
+                    var currentY: CGFloat = borderSide
+                    while currentY + perfH < canvasH - borderSide {
+                        ctx.fill(CGRect(x: perfX, y: currentY, width: perfW, height: perfH))
+                        ctx.fill(CGRect(x: canvasW - borderSide + perfX, y: currentY, width: perfW, height: perfH))
+                        currentY += perfH * 1.8
+                    }
+                }
             }
             
-            // Dibujar foto recortada dentro del marco
             let photoRect = CGRect(x: borderSide, y: borderSide, width: cropW, height: cropH)
             ctx.cgContext.saveGState()
             ctx.cgContext.clip(to: photoRect)
             image.draw(in: CGRect(x: borderSide - cropX, y: borderSide - cropY, width: origW, height: origH))
             ctx.cgContext.restoreGState()
             
-            // Dibujar Fechador Retro de Cuarzo ('26 11 12)
             if dateStampEnabled {
                 let df = DateFormatter()
                 df.dateFormat = "''yy MM dd"
@@ -472,7 +527,8 @@ class CinematicPipeline {
         vignetteAmount: Float,
         warmthAdjust: Float,
         exposureAdjust: Float,
-        lightLeakEnabled: Bool
+        lightLeakEnabled: Bool,
+        anamorphicMode: Bool
     ) -> UIImage? {
         let filtered = applyCinematicLook(
             to: ciInput,
@@ -483,6 +539,7 @@ class CinematicPipeline {
             warmthAdjust: warmthAdjust,
             exposureAdjust: exposureAdjust,
             lightLeakEnabled: lightLeakEnabled,
+            anamorphicMode: anamorphicMode,
             isRAW: false,
             is48MP: false
         )
@@ -500,6 +557,7 @@ class CinematicPipeline {
         warmthAdjust: Float = 0.0,
         exposureAdjust: Float = 0.0,
         lightLeakEnabled: Bool = false,
+        anamorphicMode: Bool = false,
         dateStampEnabled: Bool = false,
         aspectRatio: AspectRatioOption = .fourThree,
         frameStyle: FrameStyleOption = .none,
@@ -565,6 +623,7 @@ class CinematicPipeline {
             warmthAdjust: warmthAdjust,
             exposureAdjust: exposureAdjust,
             lightLeakEnabled: lightLeakEnabled,
+            anamorphicMode: anamorphicMode,
             isRAW: usedCIRAW,
             is48MP: is48MP
         )
@@ -595,7 +654,7 @@ class CinematicPipeline {
     }
 }
 
-// MARK: - 3. Controlador de Cámara Definitivo
+// MARK: - 3. Controlador de Cámara Definitivo (Con 48MP Reales .inputPriority y Shutter Speed)
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     let session = AVCaptureSession()
@@ -618,12 +677,14 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var currentZoom: CGFloat = 1.0
     var selectedProfile: FilmProfile = .chromagraph
     
-    // Controles Ópticos y Retro (Se previsualizan en VIVO y se graban en la foto)
+    // Controles Ópticos y Retro
     var exposureEV: Float = -0.35
     var warmth: Float = 0.0
     var bloomIntensity: Float = 0.35
     var grainIntensity: Float = 0.35
     var vignetteIntensity: Float = 0.35
+    var shutterSpeed: ShutterSpeedOption = .auto
+    var anamorphicMode = false
     var dateStampEnabled = false
     var lightLeakEnabled = false
     var aspectRatio: AspectRatioOption = .fourThree
@@ -826,6 +887,34 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         } catch {}
     }
     
+    func applyShutterSpeed(_ speed: ShutterSpeedOption) {
+        shutterSpeed = speed
+        sessionQueue.async {
+            guard let device = self.currentDevice else { return }
+            do {
+                try device.lockForConfiguration()
+                if speed == .auto {
+                    device.exposureMode = .continuousAutoExposure
+                } else {
+                    var duration = CMTime.invalid
+                    var iso: Float = device.iso
+                    switch speed {
+                    case .s1_2000: duration = CMTimeMake(value: 1, timescale: 2000); iso = 400
+                    case .s1_500: duration = CMTimeMake(value: 1, timescale: 500); iso = 200
+                    case .s1_125: duration = CMTimeMake(value: 1, timescale: 125); iso = 100
+                    case .s1_30: duration = CMTimeMake(value: 1, timescale: 30); iso = 64
+                    case .s1_8: duration = CMTimeMake(value: 1, timescale: 8); iso = 50
+                    case .auto: break
+                    }
+                    if duration.isValid {
+                        device.setExposureModeCustom(duration: duration, iso: iso, completionHandler: nil)
+                    }
+                }
+                device.unlockForConfiguration()
+            } catch {}
+        }
+    }
+    
     func switchCameraLens(factor: CGFloat) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         currentZoom = factor
@@ -977,7 +1066,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let grain = self.grainIntensity
         let vignette = self.vignetteIntensity
         let warmth = self.warmth
+        let exposure = self.exposureEV
         let leak = self.lightLeakEnabled
+        let anamorphic = self.anamorphicMode
         let stamp = self.dateStampEnabled
         let ratio = self.aspectRatio
         let frame = self.frameStyle
@@ -992,7 +1083,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 grainAmount: grain,
                 vignetteAmount: vignette,
                 warmthAdjust: warmth,
+                exposureAdjust: exposure,
                 lightLeakEnabled: leak,
+                anamorphicMode: anamorphic,
                 dateStampEnabled: stamp,
                 aspectRatio: ratio,
                 frameStyle: frame,
@@ -1026,16 +1119,19 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     }
 }
 
-// MARK: - 4. Capa de Previsualización Óptica en Vivo (Grano 35mm, Viñeta, Halation, Light Leak y Fecha)
+// MARK: - 4. Capa de Previsualización Óptica en Vivo (Efectos 100% interactivos)
 struct LiveOpticalEffectsView: View {
     let profile: FilmProfile
     let vignetteIntensity: Float
     let grainIntensity: Float
     let bloomIntensity: Float
     let warmth: Float
+    let exposureEV: Float
     let lightLeakEnabled: Bool
+    let anamorphicMode: Bool
     let dateStampEnabled: Bool
     let frameStyle: FrameStyleOption
+    let aspectRatio: AspectRatioOption
     
     private var currentDateStamp: String {
         let df = DateFormatter()
@@ -1046,7 +1142,6 @@ struct LiveOpticalEffectsView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // 1. Tinte de Película + Calidez (WB) en vivo
                 filmLiveOverlay(for: profile)
                 
                 if abs(warmth) > 0.02 {
@@ -1055,12 +1150,11 @@ struct LiveOpticalEffectsView: View {
                         .blendMode(.softLight)
                 }
                 
-                // 2. Halation / Difusión de luces en vivo
                 if bloomIntensity > 0.05 {
                     RadialGradient(
                         colors: [
-                            profile.badgeColor.opacity(Double(bloomIntensity) * 0.16),
-                            Color(red: 1.0, green: 0.35, blue: 0.15).opacity(Double(bloomIntensity) * 0.08),
+                            profile.badgeColor.opacity(Double(bloomIntensity) * 0.18),
+                            Color(red: 1.0, green: 0.35, blue: 0.15).opacity(Double(bloomIntensity) * 0.09),
                             .clear
                         ],
                         center: .center,
@@ -1070,7 +1164,6 @@ struct LiveOpticalEffectsView: View {
                     .blendMode(.screen)
                 }
                 
-                // 3. Fuga de Luz Analógica (Light Leak) en vivo
                 if lightLeakEnabled {
                     LinearGradient(
                         colors: [
@@ -1084,7 +1177,20 @@ struct LiveOpticalEffectsView: View {
                     .blendMode(.screen)
                 }
                 
-                // 4. Viñeteado Óptico Real en vivo (Responde directamente al Slider de Viñeteado)
+                if anamorphicMode {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.1, green: 0.5, blue: 1.0).opacity(0.32),
+                            .clear
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .blendMode(.screen)
+                    .frame(height: 14)
+                    .position(x: geo.size.width / 2, y: geo.size.height * 0.42)
+                }
+                
                 if vignetteIntensity > 0.02 {
                     RadialGradient(
                         colors: [
@@ -1098,7 +1204,6 @@ struct LiveOpticalEffectsView: View {
                     )
                 }
                 
-                // 5. Textura de Grano 35mm Animada en vivo (Responde al Slider de Grano)
                 if grainIntensity > 0.02 {
                     TimelineView(.periodic(from: .now, by: 0.09)) { timeline in
                         Canvas { context, size in
@@ -1120,7 +1225,6 @@ struct LiveOpticalEffectsView: View {
                     .blendMode(.overlay)
                 }
                 
-                // 6. Marco Polaroid / Cine Negro en vivo
                 if frameStyle != .none {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .stroke(
@@ -1129,7 +1233,6 @@ struct LiveOpticalEffectsView: View {
                         )
                 }
                 
-                // 7. Fechador Retro de Cuarzo ('26 11 12) en vivo
                 if dateStampEnabled {
                     VStack {
                         Spacer()
@@ -1195,7 +1298,7 @@ struct SeededRandomGenerator: RandomNumberGenerator {
     }
 }
 
-// MARK: - 5. Laboratorio Darkroom para Fotos de la Galería (Con Safe Area Corregida)
+// MARK: - 5. Laboratorio Darkroom Galería (Safe Area Corregida y Sin Bug de Botones)
 struct GalleryDarkroomView: View {
     let originalData: Data
     var onSaveSuccess: (UIImage, String) -> Void
@@ -1216,7 +1319,7 @@ struct GalleryDarkroomView: View {
     
     var body: some View {
         VStack(spacing: 10) {
-            // Barra Superior con Safe Area protegida (Nunca choca con la hora ni la batería)
+            // Barra superior perfectamente espaciada debajo de la Dynamic Island y notch
             HStack {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1267,9 +1370,8 @@ struct GalleryDarkroomView: View {
                 .disabled(isSaving)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.top, 16)
             
-            // Visor de foto importada
             ZStack {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(Color(white: 0.06))
@@ -1288,7 +1390,6 @@ struct GalleryDarkroomView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 14)
             
-            // Botones Rápidos Retro en el Lab (Light Leak, Fecha '98 y Marco)
             HStack(spacing: 8) {
                 Button {
                     lightLeakEnabled.toggle()
@@ -1333,7 +1434,6 @@ struct GalleryDarkroomView: View {
                 }
             }
             
-            // Deslizadores Químicos
             VStack(spacing: 8) {
                 darkroomSlider(title: "EXPOSICIÓN", value: $exposureAdjust, range: -1.5...1.5, format: "%+.1f EV")
                 darkroomSlider(title: "CALIDEZ WB", value: $warmthAdjust, range: -1.0...1.0, format: "%+.1f")
@@ -1347,7 +1447,6 @@ struct GalleryDarkroomView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 14)
             
-            // Carrusel de las 12 Cámaras
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(FilmProfile.allCases) { profile in
@@ -1380,7 +1479,7 @@ struct GalleryDarkroomView: View {
                 }
                 .padding(.horizontal, 14)
             }
-            .padding(.bottom, 10)
+            .padding(.bottom, 16)
         }
         .background(Color.black.ignoresSafeArea())
         .onAppear {
@@ -1448,7 +1547,8 @@ struct GalleryDarkroomView: View {
                 vignetteAmount: vig,
                 warmthAdjust: warm,
                 exposureAdjust: exp,
-                lightLeakEnabled: leak
+                lightLeakEnabled: leak,
+                anamorphicMode: false
             ) else { return }
             
             if stamp || frame != .none {
@@ -1490,6 +1590,7 @@ struct GalleryDarkroomView: View {
                 warmthAdjust: warm,
                 exposureAdjust: exp,
                 lightLeakEnabled: leak,
+                anamorphicMode: false,
                 dateStampEnabled: stamp,
                 aspectRatio: .fourThree,
                 frameStyle: frame,
@@ -1516,7 +1617,7 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 6. Interfaz Principal Chromagraph Studio
+// MARK: - 6. Interfaz Principal con Menú Reset Inteligente
 struct NativeCameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     var onTapFocus: (CGPoint, CGPoint) -> Void
@@ -1531,10 +1632,7 @@ struct NativeCameraPreview: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onTapFocus: onTapFocus)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(onTapFocus: onTapFocus) }
     
     class Coordinator: NSObject {
         var onTapFocus: (CGPoint, CGPoint) -> Void
@@ -1596,8 +1694,8 @@ struct ContentView: View {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 8) {
-                // Barra Superior de Telemetría y Herramientas Rápidas
-                HStack(spacing: 6) {
+                // Barra Superior con Botón de Reset y Opciones Inteligentes
+                HStack(spacing: 5) {
                     Button {
                         camera.toggleSensorMode()
                     } label: {
@@ -1606,9 +1704,9 @@ struct ContentView: View {
                                 .fill(.black)
                                 .frame(width: 6, height: 6)
                             Text(modeButtonTitle)
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                         }
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 9)
                         .padding(.vertical, 6)
                         .background(camera.selectedProfile.badgeColor)
                         .foregroundStyle(.black)
@@ -1616,9 +1714,9 @@ struct ContentView: View {
                     }
                     
                     Text(camera.statusMessage)
-                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
                         .lineLimit(1)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 7)
                         .padding(.vertical, 6)
                         .background(Color.white.opacity(0.11))
                         .foregroundStyle(.white.opacity(0.9))
@@ -1626,62 +1724,88 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    // Botón Flash
+                    // Menú de Reset (Por defecto / Recomendado / Sliders)
+                    Menu {
+                        Button("Por defecto (Cero)", systemImage: "arrow.counterclockwise") {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            camera.exposureEV = 0.0
+                            camera.warmth = 0.0
+                            camera.bloomIntensity = 0.0
+                            camera.grainIntensity = 0.0
+                            camera.vignetteIntensity = 0.0
+                            camera.setExposure(0.0)
+                        }
+                        Button("Recomendado para esta cámara", systemImage: "sparkles") {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            let rec = camera.selectedProfile.recommended
+                            camera.exposureEV = rec.ev
+                            camera.warmth = rec.warmth
+                            camera.bloomIntensity = rec.bloom
+                            camera.grainIntensity = rec.grain
+                            camera.vignetteIntensity = rec.vignette
+                            camera.setExposure(rec.ev)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward.circle")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(camera.selectedProfile.badgeColor)
+                            .padding(7)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         camera.flashEnabled.toggle()
                     } label: {
                         Image(systemName: camera.flashEnabled ? "bolt.fill" : "bolt.slash")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(camera.flashEnabled ? camera.selectedProfile.badgeColor : .white.opacity(0.75))
-                            .padding(8)
+                            .padding(7)
                             .background(Color.white.opacity(0.1))
                             .clipShape(Circle())
                     }
                     
-                    // Botón Fechador '98
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         camera.dateStampEnabled.toggle()
                     } label: {
                         Text("'98")
-                            .font(.system(size: 10, weight: .black, design: .monospaced))
+                            .font(.system(size: 9.5, weight: .black, design: .monospaced))
                             .foregroundStyle(camera.dateStampEnabled ? .black : .white.opacity(0.8))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 7)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 6)
                             .background(camera.dateStampEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.1))
                             .clipShape(Circle())
                     }
                     
-                    // Botón Cuadrícula
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         camera.showGrid.toggle()
                     } label: {
                         Image(systemName: "squareshape.split.3x3")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(camera.showGrid ? camera.selectedProfile.badgeColor : .white.opacity(0.75))
-                            .padding(8)
+                            .padding(7)
                             .background(Color.white.opacity(0.1))
                             .clipShape(Circle())
                     }
                     
-                    // Botón Ajustes Químicos
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.spring) { showControls.toggle() }
                     } label: {
                         Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(showControls ? .black : .white)
-                            .padding(8)
+                            .padding(7)
                             .background(showControls ? camera.selectedProfile.badgeColor : Color.white.opacity(0.1))
                             .clipShape(Circle())
                     }
                 }
                 .padding(.horizontal, 12)
                 
-                // Visor Principal con Grano, Viñeta, Halation y Light Leak EN VIVO
+                // Visor Principal con efectos interactivos en tiempo real
                 ZStack(alignment: .bottom) {
                     ZStack {
                         NativeCameraPreview(session: camera.session) { devicePt, viewPt in
@@ -1690,23 +1814,24 @@ struct ContentView: View {
                         .contrast(liveContrast(for: camera.selectedProfile))
                         .saturation(liveSaturation(for: camera.selectedProfile))
                         
-                        // Capa Óptica en Tiempo Real (Muestra Grano, Viñeta, Halation, Fecha y Marcos)
                         LiveOpticalEffectsView(
                             profile: camera.selectedProfile,
                             vignetteIntensity: camera.vignetteIntensity,
                             grainIntensity: camera.grainIntensity,
                             bloomIntensity: camera.bloomIntensity,
                             warmth: camera.warmth,
+                            exposureEV: camera.exposureEV,
                             lightLeakEnabled: camera.lightLeakEnabled,
+                            anamorphicMode: camera.anamorphicMode,
                             dateStampEnabled: camera.dateStampEnabled,
-                            frameStyle: camera.frameStyle
+                            frameStyle: camera.frameStyle,
+                            aspectRatio: camera.aspectRatio
                         )
                         
                         if camera.showGrid {
                             GridOverlayView()
                         }
                         
-                        // Indicador de enfoque al tocar la pantalla
                         if let pt = camera.focusPoint {
                             RoundedRectangle(cornerRadius: 4)
                                 .stroke(camera.selectedProfile.badgeColor, lineWidth: 1.5)
@@ -1731,126 +1856,151 @@ struct ContentView: View {
                     VStack(spacing: 10) {
                         if showControls {
                             VStack(spacing: 8) {
-                                // Botones de Efectos Creativos (Light Leak, Formato, Marco, Timer)
-                                HStack(spacing: 6) {
-                                    Button {
-                                        camera.lightLeakEnabled.toggle()
-                                    } label: {
-                                        Text(camera.lightLeakEnabled ? "LEAK: ON" : "LEAK: OFF")
-                                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 5)
-                                            .background(camera.lightLeakEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                            .foregroundStyle(camera.lightLeakEnabled ? .black : .white)
-                                            .clipShape(Capsule())
-                                    }
-                                    
-                                    Button {
-                                        let all = AspectRatioOption.allCases
-                                        if let idx = all.firstIndex(of: camera.aspectRatio) {
-                                            camera.aspectRatio = all[(idx + 1) % all.count]
+                                // Fila de opciones de disparo avanzado y retro
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        Button {
+                                            camera.lightLeakEnabled.toggle()
+                                        } label: {
+                                            Text(camera.lightLeakEnabled ? "LEAK: ON" : "LEAK: OFF")
+                                                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                                .padding(.horizontal, 7)
+                                                .padding(.vertical, 5)
+                                                .background(camera.lightLeakEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                                                .foregroundStyle(camera.lightLeakEnabled ? .black : .white)
+                                                .clipShape(Capsule())
                                         }
-                                    } label: {
-                                        Text(camera.aspectRatio.rawValue)
-                                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 5)
-                                            .background(camera.aspectRatio != .fourThree ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                            .foregroundStyle(camera.aspectRatio != .fourThree ? .black : .white)
-                                            .clipShape(Capsule())
-                                    }
-                                    
-                                    Button {
-                                        let all = FrameStyleOption.allCases
-                                        if let idx = all.firstIndex(of: camera.frameStyle) {
-                                            camera.frameStyle = all[(idx + 1) % all.count]
+                                        
+                                        Button {
+                                            camera.anamorphicMode.toggle()
+                                        } label: {
+                                            Text(camera.anamorphicMode ? "ANAMORPHIC: ON" : "ANAMORPHIC: OFF")
+                                                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                                .padding(.horizontal, 7)
+                                                .padding(.vertical, 5)
+                                                .background(camera.anamorphicMode ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                                                .foregroundStyle(camera.anamorphicMode ? .black : .white)
+                                                .clipShape(Capsule())
                                         }
-                                    } label: {
-                                        Text(camera.frameStyle.rawValue.uppercased())
-                                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 5)
-                                            .background(camera.frameStyle != .none ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                            .foregroundStyle(camera.frameStyle != .none ? .black : .white)
-                                            .clipShape(Capsule())
-                                    }
-                                    
-                                    Button {
-                                        camera.timerSeconds = (camera.timerSeconds == 0) ? 3 : 0
-                                    } label: {
-                                        Text(camera.timerSeconds > 0 ? "TIMER 3S" : "TIMER OFF")
-                                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 5)
-                                            .background(camera.timerSeconds > 0 ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                            .foregroundStyle(camera.timerSeconds > 0 ? .black : .white)
-                                            .clipShape(Capsule())
+                                        
+                                        Button {
+                                            let all = AspectRatioOption.allCases
+                                            if let idx = all.firstIndex(of: camera.aspectRatio) {
+                                                camera.aspectRatio = all[(idx + 1) % all.count]
+                                            }
+                                        } label: {
+                                            Text(camera.aspectRatio.rawValue)
+                                                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                                .padding(.horizontal, 7)
+                                                .padding(.vertical, 5)
+                                                .background(camera.aspectRatio != .fourThree ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                                                .foregroundStyle(camera.aspectRatio != .fourThree ? .black : .white)
+                                                .clipShape(Capsule())
+                                        }
+                                        
+                                        Button {
+                                            let all = FrameStyleOption.allCases
+                                            if let idx = all.firstIndex(of: camera.frameStyle) {
+                                                camera.frameStyle = all[(idx + 1) % all.count]
+                                            }
+                                        } label: {
+                                            Text(camera.frameStyle.rawValue.uppercased())
+                                                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                                .padding(.horizontal, 7)
+                                                .padding(.vertical, 5)
+                                                .background(camera.frameStyle != .none ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                                                .foregroundStyle(camera.frameStyle != .none ? .black : .white)
+                                                .clipShape(Capsule())
+                                        }
                                     }
                                 }
-                                .padding(.bottom, 2)
+                                
+                                // Selector de Velocidad de Obturación (Shutter Speed)
+                                HStack(spacing: 6) {
+                                    Text("SHUTTER")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .frame(width: 60, alignment: .leading)
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 5) {
+                                            ForEach(ShutterSpeedOption.allCases, id: \.self) { spd in
+                                                Button {
+                                                    camera.applyShutterSpeed(spd)
+                                                } label: {
+                                                    Text(spd.rawValue)
+                                                        .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                                                        .padding(.horizontal, 7)
+                                                        .padding(.vertical, 4)
+                                                        .background(camera.shutterSpeed == spd ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                        .foregroundStyle(camera.shutterSpeed == spd ? .black : .white)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 
                                 HStack {
                                     Text("LUCES (EV)")
-                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                        .frame(width: 76, alignment: .leading)
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .frame(width: 74, alignment: .leading)
                                     Slider(value: Binding(
                                         get: { camera.exposureEV },
                                         set: { camera.setExposure($0) }
                                     ), in: -2.0...1.0)
                                     .tint(camera.selectedProfile.badgeColor)
                                     Text(String(format: "%+.1f", camera.exposureEV))
-                                        .font(.system(size: 9.5, design: .monospaced))
-                                        .frame(width: 36)
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .frame(width: 34)
                                 }
                                 HStack {
                                     Text("CALIDEZ WB")
-                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                        .frame(width: 76, alignment: .leading)
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .frame(width: 74, alignment: .leading)
                                     Slider(value: $camera.warmth, in: -1.0...1.0)
                                         .tint(camera.selectedProfile.badgeColor)
                                     Text(String(format: "%+.1f", camera.warmth))
-                                        .font(.system(size: 9.5, design: .monospaced))
-                                        .frame(width: 36)
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .frame(width: 34)
                                 }
                                 HStack {
                                     Text("HALATION")
-                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                        .frame(width: 76, alignment: .leading)
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .frame(width: 74, alignment: .leading)
                                     Slider(value: $camera.bloomIntensity, in: 0.0...1.0)
                                         .tint(camera.selectedProfile.badgeColor)
                                     Text("\(Int(camera.bloomIntensity * 100))%")
-                                        .font(.system(size: 9.5, design: .monospaced))
-                                        .frame(width: 36)
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .frame(width: 34)
                                 }
                                 HStack {
                                     Text("GRANO 35MM")
-                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                        .frame(width: 76, alignment: .leading)
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .frame(width: 74, alignment: .leading)
                                     Slider(value: $camera.grainIntensity, in: 0.0...1.0)
                                         .tint(camera.selectedProfile.badgeColor)
                                     Text("\(Int(camera.grainIntensity * 100))%")
-                                        .font(.system(size: 9.5, design: .monospaced))
-                                        .frame(width: 36)
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .frame(width: 34)
                                 }
                                 HStack {
                                     Text("VIÑETEADO")
-                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                        .frame(width: 76, alignment: .leading)
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .frame(width: 74, alignment: .leading)
                                     Slider(value: $camera.vignetteIntensity, in: 0.0...1.0)
                                         .tint(camera.selectedProfile.badgeColor)
                                     Text("\(Int(camera.vignetteIntensity * 100))%")
-                                        .font(.system(size: 9.5, design: .monospaced))
-                                        .frame(width: 36)
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .frame(width: 34)
                                 }
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
-                            .background(Color.black.opacity(0.84))
+                            .background(Color.black.opacity(0.85))
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .padding(.horizontal, 14)
                         }
                         
-                        // Selector de 12 Cámaras Cinematográficas y Retro
+                        // Carrusel de las 12 Cámaras con Animación Fluida
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
                                 ForEach(FilmProfile.allCases) { profile in
@@ -1882,8 +2032,9 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 16)
                         }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.selectedProfile)
                         
-                        // Selector de Lentes (0.5x | 1x | 2x)
+                        // Selector de Lentes
                         HStack(spacing: 10) {
                             ForEach(zoomLevels, id: \.self) { level in
                                 Button {
@@ -1901,7 +2052,7 @@ struct ContentView: View {
                             }
                         }
                         
-                        // Barra Inferior: Última Foto | Obturador | Importar a Darkroom Lab
+                        // Barra Inferior
                         HStack {
                             Button {
                                 if camera.capturedImage != nil {
