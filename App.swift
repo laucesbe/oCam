@@ -45,7 +45,6 @@ struct DevelopedPhotoResult {
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
-    // Usamos RGBA8 sin caché intermedio para poder renderizar lienzos gigantes de 48MP (8064x6048) sin agotar la RAM
     private let ciContext = CIContext(options: [
         .workingColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
         .workingFormat: CIFormat.RGBA8,
@@ -269,7 +268,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var isProcessing = false
     var isRAWActive = false
     var is48MPSupported = false
-    var use48MPMode = true // Por defecto intenta activar los 48MP reales
+    var use48MPMode = true
     var useRAWCapture = false
     var statusMessage = "INICIANDO..."
     var currentZoom: CGFloat = 1.0
@@ -300,7 +299,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         }
     }
     
-    /// Busca y activa en el hardware del iPhone 17 el formato que habilita tanto 48MP (8064x6048) como Bayer RAW
+    /// Busca y activa en el hardware del iPhone 17 el formato que habilita 48MP (8064x6048) y 12MP
     private func unlockBestSensorFormat(for device: AVCaptureDevice) {
         var bestFormat48MP: AVCaptureDevice.Format?
         var found48MPDim: CMVideoDimensions?
@@ -312,11 +311,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 best12MPDim = d12
             }
             if let d48 = dims.first(where: { $0.width >= 8000 }) {
-                // Preferir un formato que soporte 48MP y también Bayer RAW
-                if bestFormat48MP == nil || !format.supportedRawPhotoPixelFormatTypes.isEmpty {
-                    bestFormat48MP = format
-                    found48MPDim = d48
-                }
+                bestFormat48MP = format
+                found48MPDim = d48
             }
         }
         
@@ -375,14 +371,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     
     func toggleSensorMode() {
         if use48MPMode {
-            // Pasar de 48MP Cine -> 12MP Bayer RAW
             use48MPMode = false
             useRAWCapture = true
         } else if useRAWCapture {
-            // Pasar de 12MP Bayer RAW -> 12MP Cine Rápido
             useRAWCapture = false
         } else {
-            // Volver a 48MP Cine (si el lente 1x lo soporta)
             if is48MPSupported && currentZoom == 1.0 {
                 use48MPMode = true
                 useRAWCapture = false
@@ -498,7 +491,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                     processedFormat: [AVVideoCodecKey: processedCodec]
                 )
                 settings.photoQualityPrioritization = .speed
-                // Apple exige que Bayer RAW en modelos no-Pro se dispare en 12MP (4032x3024)
+                self.photoOutput.maxPhotoDimensions = self.max12MPDimension
                 settings.maxPhotoDimensions = self.max12MPDimension
             } else {
                 if self.photoOutput.availablePhotoCodecTypes.contains(.hevc) {
@@ -512,6 +505,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                     self.photoOutput.maxPhotoDimensions = d48
                     settings.maxPhotoDimensions = d48
                 } else {
+                    self.photoOutput.maxPhotoDimensions = self.max12MPDimension
                     settings.maxPhotoDimensions = self.max12MPDimension
                 }
             }
@@ -531,7 +525,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             return
         }
         
-        // Si disparamos en modo 12MP RAW, ignorar el archivo HEVC acompañante para no duplicar la foto
         if self.useRAWCapture && !self.use48MPMode && self.currentZoom == 1.0 && !photo.isRawPhoto && !self.photoOutput.availableRawPhotoPixelFormatTypes.isEmpty {
             return
         }
