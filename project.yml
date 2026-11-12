@@ -10,16 +10,12 @@ targets:
       - path: .
         includes:
           - "*.swift"
-          - "Assets.xcassets"
-    settings:
-      base:
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Info.plist
       properties:
         UILaunchScreen: {}
         NSCameraUsageDescription: "Acceso directo al sensor RAW para revelado cinematográfico."
         NSPhotoLibraryAddUsageDescription: "Guardar tus fotos reveladas en el carrete."
-        NSPhotoLibraryUsageDescription: "Guardar y verificar fotos RAW reveladas en tu galería."
+        NSPhotoLibraryUsageDescription: "Guardar tus fotos reveladas en la galería."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
