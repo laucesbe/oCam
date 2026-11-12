@@ -1,0 +1,41 @@
+name: Crear IPA para iPhone
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Generar Proyecto Xcode
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Compilar App sin firma (para Sideloadly)
+        run: |
+          xcodebuild -project ChromaCam.xcodeproj \
+            -scheme ChromaCam \
+            -configuration Release \
+            -derivedDataPath build \
+            -sdk iphoneos \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Empaquetar archivo .ipa
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/ChromaCam.app Payload/
+          zip -r ChromaCam.ipa Payload
+
+      - name: Subir archivo IPA listo para descargar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChromaCam-IPA
+          path: ChromaCam.ipa
