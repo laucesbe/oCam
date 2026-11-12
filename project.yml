@@ -1,11 +1,11 @@
-name: ChromaCam
+name: oCam
 options:
   bundleIdPrefix: com.personal
 targets:
-  ChromaCam:
+  oCam:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "17.2"
     sources:
       - path: .
         includes:
@@ -14,12 +14,15 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_NAME: oCam
     info:
       path: Info.plist
       properties:
+        CFBundleDisplayName: oCam
+        CFBundleName: oCam
         UILaunchScreen: {}
-        NSCameraUsageDescription: "Acceso directo al sensor RAW para revelado cinematográfico."
-        NSPhotoLibraryAddUsageDescription: "Guardar tus fotos reveladas en el carrete."
-        NSPhotoLibraryUsageDescription: "Guardar tus fotos reveladas en la galería."
+        NSCameraUsageDescription: "oCam accede directamente al sensor para captura cinematográfica."
+        NSPhotoLibraryAddUsageDescription: "Guardar tus fotos con metadatos EXIF completos en la fototeca."
+        NSPhotoLibraryUsageDescription: "Importar y revelar fotos en el laboratorio de oCam."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
