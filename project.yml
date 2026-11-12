@@ -1,0 +1,20 @@
+name: ChromaCam
+options:
+  bundleIdPrefix: com.personal
+targets:
+  ChromaCam:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: .
+        includes:
+          - "*.swift"
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSCameraUsageDescription: "Acceso directo al sensor RAW para revelado cinematográfico."
+        NSPhotoLibraryAddUsageDescription: "Guardar tus fotos reveladas en el carrete."
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
