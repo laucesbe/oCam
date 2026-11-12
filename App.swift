@@ -4,7 +4,6 @@ import CoreImage
 import CoreImage.CIFilterBuiltins
 import CoreMotion
 import Photos
-import ImageIO
 import UIKit
 
 @main
@@ -36,19 +35,21 @@ enum FilmProfile: String, CaseIterable, Identifiable {
     }
 }
 
+struct DevelopedPhotoResult {
+    let jpegData: Data?
+    let previewImage: UIImage?
+    let status: String
+}
+
 // MARK: - 2. Motor de Revelado RAW Cinematográfico
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
-    let colorSpace = CGColorSpace(name: CGColorSpace.displayP3) ?? CGColorSpaceCreateDeviceRGB()
-    lazy var ciContext: CIContext = {
-        CIContext(options: [
-            .workingColorSpace: colorSpace,
-            .outputColorSpace: colorSpace,
-            .workingFormat: CIFormat.RGBAh,
-            .cacheIntermediates: false
-        ])
-    }()
+    private let ciContext = CIContext(options: [
+        .workingColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
+        .workingFormat: CIFormat.RGBAh,
+        .cacheIntermediates: false
+    ])
     
     func applyCinematicLook(to input: CIImage, profile: FilmProfile, bloomAmount: Float, isRAW: Bool) -> CIImage {
         var current = input
@@ -60,7 +61,9 @@ class CinematicPipeline {
         hs.inputImage = current
         hs.highlightAmount = 0.38
         hs.shadowAmount = isRAW ? 0.36 : 0.25
-        if let out = hs.outputImage?.cropped(to: extent) { current = out }
+        if let out = hs.outputImage?.cropped(to: extent) {
+            current = out
+        }
         
         // 2. Curvas de Cine y Matrices de Color
         let curve = CIFilter.toneCurve()
@@ -168,76 +171,154 @@ class CinematicPipeline {
         profile: FilmProfile,
         bloomAmount: Float,
         deviceOrientation: UIDeviceOrientation
-    ) -> (jpegData: Data?, previewImage: UIImage?, debugStatus: String) {
-        return autoreleasepool {
-            var baseImage: CIImage?
-            var usedCIRAW = false
-            
-            let targetExifOrientation: CGImagePropertyOrientation
-            switch deviceOrientation {
-            case .landscapeLeft: targetExifOrientation = .up
-            case .landscapeRight: targetExifOrientation = .down
-            case .portraitUpsideDown: targetExifOrientation = .left
-            default: targetExifOrientation = .right
-            }
-            
-            // 1. Revelado RAW directo del sensor saltándose el procesado de Apple
-            if wasCapturedAsRAW, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
-                rawFilter.luminanceNoiseReductionAmount = 0.72
-                rawFilter.colorNoiseReductionAmount = 0.88
-                rawFilter.sharpnessAmount = 0.08
-                rawFilter.localToneMapAmount = 0.0
-                rawFilter.boostAmount = 0.30
-                rawFilter.baselineExposure = 0.25
-                rawFilter.scaleFactor = 0.5
-                
-                if var rawOut = rawFilter.outputImage {
-                    if rawOut.extent.width > rawOut.extent.height {
-                        rawOut = rawOut.oriented(targetExifOrientation)
-                    } else if deviceOrientation == .landscapeLeft {
-                        rawOut = rawOut.oriented(.left)
-                    } else if deviceOrientation == .landscapeRight {
-                        rawOut = rawOut.oriented(.right)
-                    }
-                    baseImage = rawOut
-                    usedCIRAW = true
-                }
-            }
-            
-            // 2. Decodificación estándar con rotación física garantizada
-            if baseImage == nil, var std = CIImage(data: data, options: [.applyOrientationProperty: true]) {
-                if std.extent.width > std.extent.height && !deviceOrientation.isLandscape {
-                    std = std.oriented(.right)
-                }
-                let maxDim = max(std.extent.width, std.extent.height)
-                if maxDim > 3500 {
-                    let scale = 3024.0 / maxDim
-                    std = std.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-                }
-                baseImage = std
-            }
-            
-            guard let input = baseImage else {
-                return (nil, nil, "ERROR AL LEER DATOS")
-            }
-            
-            let normalizedInput = input.transformed(by: CGAffineTransform(translationX: -input.extent.origin.x, y: -input.extent.origin.y))
-            let processed = applyCinematicLook(to: normalizedInput, profile: profile, bloomAmount: bloomAmount, isRAW: usedCIRAW)
-            
-            let qualityKey = CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String)
-            guard let jpegData = ciContext.jpegRepresentation(
-                of: processed,
-                colorSpace: colorSpace,
-                options: [qualityKey: 0.95]
-            ) else {
-                return (nil, nil, "ERROR AL CODIFICAR JPEG")
-            }
-            
-            let previewUI = UIImage(data: jpegData)
-            let status = usedCIRAW ? "RAW GUARDADO EN FOTOS" : "CINE 16-BIT GUARDADO"
-            return (jpegData, previewUI, status)
+    ) -> DevelopedPhotoResult {
+        var baseImage: CIImage?
+        var usedCIRAW = false
+        
+        let targetExifOrientation: CGImagePropertyOrientation
+        switch deviceOrientation {
+        case .landscapeLeft: targetExifOrientation = .up
+        case .landscapeRight: targetExifOrientation = .down
+        case .portraitUpsideDown: targetExifOrientation = .left
+        default: targetExifOrientation = .right
         }
+        
+        // 1. Revelado RAW directo del sensor saltándose el procesado de Apple
+        if wasCapturedAsRAW, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
+            rawFilter.luminanceNoiseReductionAmount = 0.72
+            rawFilter.colorNoiseReductionAmount = 0.88
+            rawFilter.sharpnessAmount = 0.08
+            rawFilter.localToneMapAmount = 0.0
+            rawFilter.boostAmount = 0.30
+            rawFilter.baselineExposure = 0.25
+            rawFilter.scaleFactor = 0.5
+            
+            if var rawOut = rawFilter.outputImage {
+                if rawOut.extent.width > rawOut.extent.height {
+                    rawOut = rawOut.oriented(targetExifOrientation)
+                } else if deviceOrientation == .landscapeLeft {
+                    rawOut = rawOut.oriented(.left)
+                } else if deviceOrientation == .landscapeRight {
+                    rawOut = rawOut.oriented(.right)
+                }
+                baseImage = rawOut
+                usedCIRAW = true
+            }
+        }
+        
+        // 2. Decodificación estándar con rotación física garantizada
+        if baseImage == nil, var std = CIImage(data: data, options: [.applyOrientationProperty: true]) {
+            if std.extent.width > std.extent.height && !deviceOrientation.isLandscape {
+                std = std.oriented(.right)
+            }
+            let maxDim = max(std.extent.width, std.extent.height)
+            if maxDim > 3500 {
+                let scale = 3024.0 / maxDim
+                std = std.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            }
+            baseImage = std
+        }
+        
+        guard let input = baseImage else {
+            return DevelopedPhotoResult(jpegData: nil, previewImage: nil, status: "ERROR AL LEER DATOS")
+        }
+        
+        let normalizedInput = input.transformed(by: CGAffineTransform(translationX: -input.extent.origin.x, y: -input.extent.origin.y))
+        let processed = applyCinematicLook(to: normalizedInput, profile: profile, bloomAmount: bloomAmount, isRAW: usedCIRAW)
+        
+        guard let cgImage = ciContext.createCGImage(processed, from: processed.extent) else {
+            return DevelopedPhotoResult(jpegData: nil, previewImage: nil, status: "ERROR RENDER GPU")
+        }
+        
+        let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
+        guard let jpegData = uiImage.jpegData(compressionQuality: 0.95) else {
+            return DevelopedPhotoResult(jpegData: nil, previewImage: uiImage, status: "ERROR JPEG")
+        }
+        
+        let statusText = usedCIRAW ? "RAW GUARDADO EN FOTOS" : "CINE 16-BIT GUARDADO"
+        return DevelopedPhotoResult(jpegData: jpegData, previewImage: uiImage, status: statusText)
     }
 }
 
-// MARK: - 3. Controlador de Cámara Blindado Contra Cras
+// MARK: - 3. Controlador de Cámara Blindado Contra Crashes de AVFoundation
+@Observable
+class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
+    let session = AVCaptureSession()
+    private let photoOutput = AVCapturePhotoOutput()
+    private let sessionQueue = DispatchQueue(label: "com.chromacam.sessionQueue")
+    private let motionManager = CMMotionManager()
+    
+    private var currentDevice: AVCaptureDevice?
+    private var lastExposureUpdate: Date = .distantPast
+    
+    var capturedImage: UIImage?
+    var isProcessing = false
+    var isRAWActive = false
+    var useRAWCapture = true
+    var statusMessage = "INICIANDO..."
+    var currentZoom: CGFloat = 1.0
+    var selectedProfile: FilmProfile = .chromagraph
+    var exposureEV: Float = -0.45
+    var bloomIntensity: Float = 0.45
+    var physicalOrientation: UIDeviceOrientation = .portrait
+    
+    override init() {
+        super.init()
+        startMotionTracking()
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { _ in }
+        sessionQueue.async {
+            self.configureSession()
+        }
+    }
+    
+    private func startMotionTracking() {
+        guard motionManager.isAccelerometerAvailable else { return }
+        motionManager.accelerometerUpdateInterval = 0.25
+        motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+            guard let self = self, let acc = data?.acceleration else { return }
+            if abs(acc.y) > abs(acc.x) {
+                self.physicalOrientation = acc.y < 0 ? .portrait : .portraitUpsideDown
+            } else {
+                self.physicalOrientation = acc.x < 0 ? .landscapeLeft : .landscapeRight
+            }
+        }
+    }
+    
+    private func configureSession() {
+        session.beginConfiguration()
+        session.sessionPreset = .photo
+        
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              let input = try? AVCaptureDeviceInput(device: device) else {
+            session.commitConfiguration()
+            return
+        }
+        
+        currentDevice = device
+        if session.canAddInput(input) {
+            session.addInput(input)
+        }
+        
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+            photoOutput.maxPhotoQualityPrioritization = .speed
+        }
+        
+        session.commitConfiguration()
+        session.startRunning()
+        
+        applyExposureInternal(exposureEV)
+        updateRAWStatusBadge()
+    }
+    
+    private func updateRAWStatusBadge() {
+        let hasRAW = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
+        DispatchQueue.main.async {
+            self.isRAWActive = hasRAW
+            self.statusMessage = (hasRAW && self.useRAWCapture && self.currentZoom == 1.0)
+                ? "BAYER RAW ACTIVO"
+                : "PIPELINE CINE ACTIVO"
+        }
+    }
+    
+    func setExposure(_ ev: Float
