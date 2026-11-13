@@ -99,7 +99,7 @@ enum FilmProfile: String, CaseIterable, Identifiable {
         case .ocamMaster:
             return RecommendedSettings(ev: -0.35, contrastSCurve: 0.65, warmth: 0.0, bloom: 0.30, grain: 0.24, vignette: 0.20, fadeMatte: 0.14, saturationAdjust: -0.10, nightMode: false)
         case .cineChrome:
-            // Palms 70s por defecto con Viñeta en 0% (0.0) y Halation al máximo (100% / 1.0)
+            // Palms 70s por defecto: Viñeta en 0% (0.0) y Halation al máximo (100% / 1.0)
             return RecommendedSettings(ev: -0.40, contrastSCurve: 0.74, warmth: 0.06, bloom: 1.00, grain: 0.30, vignette: 0.00, fadeMatte: 0.22, saturationAdjust: -0.16, nightMode: false)
         case .kodak2383:
             return RecommendedSettings(ev: -0.40, contrastSCurve: 0.78, warmth: 0.0, bloom: 0.34, grain: 0.26, vignette: 0.28, fadeMatte: 0.18, saturationAdjust: -0.08, nightMode: false)
@@ -215,7 +215,6 @@ class CinematicPipeline {
             if let out = exp.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 1. Corrección de Exceso de Verde y Reducción de Ruido para Bayer RAW en poca luz
         if isRAW {
             let rawGreenFix = CIFilter.colorMatrix()
             rawGreenFix.inputImage = current
@@ -240,7 +239,6 @@ class CinematicPipeline {
             if let out = wbFix.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 2. Recuperación de Altas Luces y Sombras
         let hs = CIFilter.highlightShadowAdjust()
         hs.inputImage = current
         let baseHighlight: Float = nightModeBoost ? 0.22 : 0.32
@@ -250,7 +248,6 @@ class CinematicPipeline {
         hs.radius = Float(26.0 * scaleMultiplier)
         if let out = hs.outputImage?.cropped(to: extent) { current = out }
         
-        // 3. Emulación de Color y Desaturación Orgánica
         let vibrance = CIFilter.vibrance()
         vibrance.inputImage = current
         let colorControls = CIFilter.colorControls()
@@ -377,9 +374,10 @@ class CinematicPipeline {
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
         case .ilfordHP5:
-            let mono = CIFilter.photoEffectMono()
-            mono.inputImage = current
-            if let out = mono.outputImage?.cropped(to: extent) { current = out }
+            colorControls.inputImage = current
+            colorControls.saturation = 0.0
+            colorControls.contrast = 0.98
+            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
         case .triX400:
             let noir = CIFilter.photoEffectNoir()
@@ -387,7 +385,6 @@ class CinematicPipeline {
             if let out = noir.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 4. Curva Tonal S-Curve + Matte Fade Analógico + Highlight Roll-off
         let sAmount = Double(contrastSCurve)
         let matteLift = Double(fadeMatteAmount) * 0.085
         let curve = CIFilter.toneCurve()
@@ -406,14 +403,12 @@ class CinematicPipeline {
         curve.point4 = CGPoint(x: 1.00, y: whiteRollOff)
         if let out = curve.outputImage?.cropped(to: extent) { current = out }
         
-        // 5. Micro-contraste Óptico
         let clarity = CIFilter.unsharpMask()
         clarity.inputImage = current
         clarity.radius = Float(min(18.0, 10.0 * scaleMultiplier))
         clarity.intensity = 0.22
         if let out = clarity.outputImage?.cropped(to: extent) { current = out }
         
-        // 6. Modo Retrato Óptico
         if portraitDepthBlur > 0.05 {
             let blur = CIFilter.gaussianBlur()
             blur.inputImage = current.clampedToExtent()
@@ -435,7 +430,6 @@ class CinematicPipeline {
             }
         }
         
-        // 7. Halation / Difusión en luces
         if bloomAmount > 0.04 {
             let bloom = CIFilter.bloom()
             bloom.inputImage = current.clampedToExtent()
@@ -444,7 +438,6 @@ class CinematicPipeline {
             if let out = bloom.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 8. Viñeteado Óptico Natural
         if vignetteAmount > 0.02 {
             let vignette = CIFilter.vignette()
             vignette.inputImage = current
@@ -453,7 +446,6 @@ class CinematicPipeline {
             if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 9. Fuga de Luz Analógica Opcional
         if lightLeakEnabled {
             let grad = CIFilter.linearGradient()
             grad.point0 = CGPoint(x: 0, y: extent.height * 0.85)
@@ -468,7 +460,6 @@ class CinematicPipeline {
             }
         }
         
-        // 10. Lente Anamórfico Opcional
         if anamorphicMode {
             let flare = CIFilter.linearGradient()
             flare.point0 = CGPoint(x: extent.width * 0.1, y: extent.height * 0.5)
@@ -483,7 +474,6 @@ class CinematicPipeline {
             }
         }
         
-        // 11. Grano 35mm Real Escalado a los Megapíxeles
         if grainAmount > 0.02, let rawNoise = CIFilter.randomGenerator().outputImage {
             let grainScale = max(1.8, min(extent.width, extent.height) / 920.0)
             let scaledNoise = rawNoise.transformed(by: CGAffineTransform(scaleX: grainScale, y: grainScale))
@@ -696,7 +686,8 @@ class CinematicPipeline {
         data: Data,
         rawMetadata: [String: Any]?,
         wasCapturedAsRAW: Bool,
-        cameraWhiteBalanceTempAndTint: (temp: Float, tint: Float)? = nil,
+        wbTemp: Float = 0.0,
+        wbTint: Float = 0.0,
         profile: FilmProfile,
         contrastSCurve: Float,
         bloomAmount: Float,
@@ -735,7 +726,6 @@ class CinematicPipeline {
         default: targetExifOrientation = .right
         }
         
-        // Limpieza de ruido en Bayer RAW usando las propiedades 100% compatibles con el SDK de iOS 18.5
         if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
             rawFilter.luminanceNoiseReductionAmount = 0.94
             rawFilter.colorNoiseReductionAmount = 1.00
@@ -746,9 +736,9 @@ class CinematicPipeline {
             rawFilter.baselineExposure = -0.15
             rawFilter.scaleFactor = 1.0
             
-            if let wb = cameraWhiteBalanceTempAndTint, wb.temp > 2000 && wb.temp < 10000 {
-                rawFilter.neutralTemperature = wb.temp
-                rawFilter.neutralTint = wb.tint
+            if wbTemp > 2000 && wbTemp < 10000 {
+                rawFilter.neutralTemperature = wbTemp
+                rawFilter.neutralTint = wbTint
             }
             
             if var rawOut = rawFilter.outputImage {
@@ -765,8 +755,14 @@ class CinematicPipeline {
         }
         
         if baseImage == nil, var std = CIImage(data: data, options: [.applyOrientationProperty: true]) {
-            if !isFromGallery && std.extent.width > std.extent.height && !deviceOrientation.isLandscape {
-                std = std.oriented(.right)
+            if !isFromGallery {
+                if std.extent.width > std.extent.height && !deviceOrientation.isLandscape {
+                    std = std.oriented(.right)
+                } else if std.extent.height > std.extent.width && deviceOrientation == .landscapeLeft {
+                    std = std.oriented(.left)
+                } else if std.extent.height > std.extent.width && deviceOrientation == .landscapeRight {
+                    std = std.oriented(.right)
+                }
             }
             baseImage = std
         }
@@ -826,7 +822,7 @@ class CinematicPipeline {
     }
 }
 
-// MARK: - 3. Controlador de Hardware oCam
+// MARK: - 3. Controlador de Hardware oCam (Soporte Vertical y Horizontal Automático)
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     let session = AVCaptureSession()
@@ -852,7 +848,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var statusMessage = "48MP PRO"
     var lastExifSummary = "1/125s | f/1.6 | ISO 64"
     var currentZoom: CGFloat = 1.0
-    var selectedProfile: FilmProfile = .cineChrome // Palms 70s por defecto (Viñeta 0, Halation 100%)
+    var selectedProfile: FilmProfile = .cineChrome
     
     var exposureEV: Float = -0.40
     var contrastSCurve: Float = 0.74
@@ -876,6 +872,16 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var countdownRemaining: Int = 0
     var focusPoint: CGPoint?
     var physicalOrientation: UIDeviceOrientation = .portrait
+    
+    // Ángulo de rotación suave para los iconos cuando pones el iPhone en horizontal (estilo Cámara de iOS)
+    var uiRotationDegrees: Double {
+        switch physicalOrientation {
+        case .landscapeLeft: return 90.0
+        case .landscapeRight: return -90.0
+        case .portraitUpsideDown: return 180.0
+        default: return 0.0
+        }
+    }
     
     override init() {
         super.init()
@@ -1293,10 +1299,12 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             return
         }
         
-        var measuredWB: (temp: Float, tint: Float)? = nil
+        var measuredTemp: Float = 0.0
+        var measuredTint: Float = 0.0
         if let dev = self.currentDevice {
             let tt = dev.temperatureAndTintValues(for: dev.deviceWhiteBalanceGains)
-            measuredWB = (tt.temperature, tt.tint)
+            measuredTemp = tt.temperature
+            measuredTint = tt.tint
         }
         
         let wasRAW = photo.isRawPhoto
@@ -1325,7 +1333,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 data: data,
                 rawMetadata: photoMeta,
                 wasCapturedAsRAW: wasRAW,
-                cameraWhiteBalanceTempAndTint: measuredWB,
+                wbTemp: measuredTemp,
+                wbTint: measuredTint,
                 profile: profile,
                 contrastSCurve: sCurve,
                 bloomAmount: bloom,
@@ -2114,7 +2123,7 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 7. Interfaz Principal oCam (Con Menú Desplegable Nativo de iOS y Pestañas en 1 Línea)
+// MARK: - 7. Interfaz Principal oCam Modular (Compilación Rápida + Rotación Horizontal de Iconos)
 struct GridOverlayView: View {
     let showHorizon: Bool
     let horizonDegrees: Double
@@ -2184,523 +2193,10 @@ struct ContentView: View {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 12) {
-                // 1. Barra Superior Minimalista (Amplia, con Menú Desplegable Nativo de iOS para Funciones Extra)
-                HStack(spacing: 10) {
-                    // Botón 48MP / RAW / 12MP (Siempre en 1 sola línea horizontal)
-                    Button {
-                        camera.toggleSensorMode()
-                    } label: {
-                        Text(modeButtonTitle)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(camera.useRAWCapture || camera.use48MPMode ? camera.selectedProfile.badgeColor : Color.white.opacity(0.15))
-                            .foregroundStyle(camera.useRAWCapture || camera.use48MPMode ? .black : .white)
-                            .clipShape(Capsule())
-                    }
-                    
-                    // Botón Flash
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        camera.flashEnabled.toggle()
-                    } label: {
-                        Image(systemName: camera.flashEnabled ? "bolt.fill" : "bolt.slash")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(camera.flashEnabled ? .yellow : .white.opacity(0.85))
-                            .frame(width: 34, height: 34)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(Circle())
-                    }
-                    
-                    Spacer()
-                    
-                    // Título central oCam con indicador de Temporizador si está activo
-                    HStack(spacing: 6) {
-                        Text("oCam")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .foregroundStyle(.white.opacity(0.95))
-                        
-                        if camera.timerSeconds > 0 {
-                            Text("\(camera.timerSeconds)s")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                                .foregroundStyle(.black)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.yellow)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    // Botón de Exposición Directa (+/- EV)
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showExposureBar.toggle()
-                            if showExposureBar { showTray = false }
-                        }
-                    } label: {
-                        Image(systemName: "plusminus.circle")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(showExposureBar ? camera.selectedProfile.badgeColor : .white.opacity(0.85))
-                            .frame(width: 34, height: 34)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(Circle())
-                    }
-                    
-                    // MENÚ DESPLEGABLE NATIVO DE iOS (Agrupa Temporizador, Noche, Retrato, 2X Exp, Fecha '98 y Extras sin saturar la pantalla)
-                    Menu {
-                        Section("Temporizador de Disparo") {
-                            Button {
-                                camera.timerSeconds = 0
-                            } label: {
-                                Label("Desactivado", systemImage: camera.timerSeconds == 0 ? "checkmark" : "timer")
-                            }
-                            Button {
-                                camera.timerSeconds = 3
-                            } label: {
-                                Label("3 Segundos", systemImage: camera.timerSeconds == 3 ? "checkmark" : "timer")
-                            }
-                            Button {
-                                camera.timerSeconds = 10
-                            } label: {
-                                Label("10 Segundos", systemImage: camera.timerSeconds == 10 ? "checkmark" : "timer")
-                            }
-                        }
-                        
-                        Section("Modos de Cámara") {
-                            Button {
-                                camera.nightModeEnabled.toggle()
-                                camera.updateNightModeHardware()
-                            } label: {
-                                Label(camera.nightModeEnabled ? "Modo Noche: Activo" : "Modo Noche", systemImage: "moon.stars.fill")
-                            }
-                            
-                            Button {
-                                camera.portraitDepthBlur = (camera.portraitDepthBlur > 0.05) ? 0.0 : 0.65
-                            } label: {
-                                Label(camera.portraitDepthBlur > 0.05 ? "Modo Retrato (f/1.4): Activo" : "Modo Retrato (f/1.4)", systemImage: "camera.aperture")
-                            }
-                            
-                            Button {
-                                camera.doubleExposureEnabled.toggle()
-                                if !camera.doubleExposureEnabled { camera.doubleExposureFirstShot = nil }
-                            } label: {
-                                Label(camera.doubleExposureEnabled ? "Doble Exposición (2X): Activo" : "Doble Exposición (2X)", systemImage: "square.on.square.dashed")
-                            }
-                            
-                            Button {
-                                camera.anamorphicMode.toggle()
-                            } label: {
-                                Label(camera.anamorphicMode ? "Destello Anamórfico: Activo" : "Destello Anamórfico", systemImage: "sparkles.tv")
-                            }
-                        }
-                        
-                        Section("Óptica Retro y Visor") {
-                            Button {
-                                camera.dateStampEnabled.toggle()
-                            } label: {
-                                Label(camera.dateStampEnabled ? "Fechador '98: Activo" : "Fechador '98", systemImage: "calendar")
-                            }
-                            
-                            Button {
-                                camera.lightLeakEnabled.toggle()
-                            } label: {
-                                Label(camera.lightLeakEnabled ? "Light Leak: Activo" : "Light Leak Analógico", systemImage: "sun.max.trianglebadge.exclamationmark")
-                            }
-                            
-                            Button {
-                                camera.showGrid.toggle()
-                            } label: {
-                                Label(camera.showGrid ? "Cuadrícula: Visible" : "Mostrar Cuadrícula", systemImage: "squareshape.split.3x3")
-                            }
-                            
-                            Button {
-                                camera.showHorizonAndHistogram.toggle()
-                            } label: {
-                                Label(camera.showHorizonAndHistogram ? "Nivel Horizonte: Visible" : "Mostrar Nivel Horizonte", systemImage: "level")
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(hasExtraFeaturesActive ? .black : .white)
-                            .frame(width: 34, height: 34)
-                            .background(hasExtraFeaturesActive ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                            .clipShape(Circle())
-                    }
-                    
-                    // Botón Chevron para desplegar los Sliders de Cine
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                            showTray.toggle()
-                            if showTray { showExposureBar = false }
-                        }
-                    } label: {
-                        Image(systemName: showTray ? "chevron.down" : "chevron.up")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(showTray ? .black : .white)
-                            .frame(width: 34, height: 34)
-                            .background(showTray ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                            .clipShape(Circle())
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.6))
-                .padding(.horizontal, 16)
-                
-                // 2. Visor Principal con Márgenes Laterales Elegantes (No llega hasta el borde de la pantalla)
-                GeometryReader { outerGeo in
-                    let sideMargin: CGFloat = 36.0 // 18pt de margen negro limpio a cada lado del visor
-                    let availW = max(100, outerGeo.size.width - sideMargin)
-                    let availH = max(100, outerGeo.size.height - 6)
-                    let targetRatio = camera.aspectRatio.portraitRatio
-                    let frameW = min(availW, availH * targetRatio)
-                    let frameH = min(availH, frameW / targetRatio)
-                    
-                    ZStack {
-                        ZStack {
-                            NativeCameraPreview(session: camera.session) { devicePt, viewPt in
-                                camera.focusAt(normalizedPoint: devicePt, viewPoint: viewPt)
-                            }
-                            .contrast(liveContrast(for: camera.selectedProfile) + Double(camera.contrastSCurve) * 0.12)
-                            .saturation(max(0.0, liveSaturation(for: camera.selectedProfile) + Double(camera.saturationAdjust) * 0.35))
-                            
-                            LiveOpticalEffectsView(
-                                profile: camera.selectedProfile,
-                                contrastSCurve: camera.contrastSCurve,
-                                fadeMatteAmount: camera.fadeMatteAmount,
-                                vignetteIntensity: camera.vignetteIntensity,
-                                grainIntensity: camera.grainIntensity,
-                                bloomIntensity: camera.bloomIntensity,
-                                warmth: camera.warmth,
-                                portraitDepthBlur: camera.portraitDepthBlur,
-                                lightLeakEnabled: camera.lightLeakEnabled,
-                                anamorphicMode: camera.anamorphicMode,
-                                dateStampEnabled: camera.dateStampEnabled,
-                                frameStyle: camera.frameStyle,
-                                doubleExposureGhost: camera.doubleExposureFirstShot
-                            )
-                            
-                            if camera.showGrid {
-                                GridOverlayView(
-                                    showHorizon: camera.showHorizonAndHistogram,
-                                    horizonDegrees: camera.horizonAngleDegrees
-                                )
-                            }
-                            
-                            if let pt = camera.focusPoint {
-                                HStack(spacing: 8) {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(camera.selectedProfile.badgeColor, lineWidth: 1.5)
-                                        .frame(width: 62, height: 62)
-                                    
-                                    Image(systemName: "sun.max.fill")
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(camera.selectedProfile.badgeColor)
-                                }
-                                .position(pt)
-                            }
-                            
-                            if camera.countdownRemaining > 0 {
-                                Text("\(camera.countdownRemaining)")
-                                    .font(.system(size: 72, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                    .shadow(radius: 10)
-                            }
-                        }
-                        .frame(width: frameW, height: frameH)
-                        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                .stroke(Color.white.opacity(0.20), lineWidth: 0.9)
-                        )
-                        .shadow(color: .black.opacity(0.5), radius: 12)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: camera.aspectRatio)
-                        
-                        // Controles Flotantes dentro del Visor
-                        VStack {
-                            HStack(spacing: 6) {
-                                Text("\(camera.selectedProfile.rawValue) • \(camera.statusMessage)")
-                                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                    .lineLimit(1)
-                                    .fixedSize(horizontal: true, vertical: false)
-                                    .foregroundStyle(.white.opacity(0.92))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 5)
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Capsule())
-                            }
-                            .padding(.top, 12)
-                            
-                            Spacer()
-                            
-                            if showExposureBar {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "sun.min.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.7))
-                                    Slider(value: Binding(
-                                        get: { camera.exposureEV },
-                                        set: { camera.setExposure($0) }
-                                    ), in: -2.0...1.5)
-                                    .tint(camera.selectedProfile.badgeColor)
-                                    Text(String(format: "%+.1f EV", camera.exposureEV))
-                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                        .lineLimit(1)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                        .foregroundStyle(camera.selectedProfile.badgeColor)
-                                        .frame(width: 54)
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(.ultraThinMaterial)
-                                .clipShape(Capsule())
-                                .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.6))
-                                .padding(.horizontal, 28)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                            }
-                            
-                            // Bandeja de Ajustes con Pestañas Cortas en 1 Sola Línea (Tone | Grain | Format)
-                            if showTray {
-                                VStack(spacing: 10) {
-                                    HStack(spacing: 6) {
-                                        trayTabPill(index: 0, title: "Tone")
-                                        trayTabPill(index: 1, title: "Grain")
-                                        trayTabPill(index: 2, title: "Format")
-                                        
-                                        Spacer(minLength: 4)
-                                        
-                                        Menu {
-                                            Button("Recomendado para \(camera.selectedProfile.rawValue)", systemImage: "sparkles") {
-                                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                                camera.applyRecommendedForCurrentProfile()
-                                            }
-                                            Button("Por defecto (Neutro)", systemImage: "arrow.counterclockwise") {
-                                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                                camera.resetToNeutral()
-                                            }
-                                        } label: {
-                                            HStack(spacing: 3) {
-                                                Image(systemName: "arrow.uturn.backward")
-                                                Text("Reset")
-                                                    .lineLimit(1)
-                                                    .fixedSize(horizontal: true, vertical: false)
-                                            }
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(.black)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 6)
-                                            .background(camera.selectedProfile.badgeColor)
-                                            .clipShape(Capsule())
-                                        }
-                                    }
-                                    
-                                    if activeDrawerTab == 0 {
-                                        glassSliderRow(title: "EXPOSICIÓN", value: Binding(
-                                            get: { camera.exposureEV },
-                                            set: { camera.setExposure($0) }
-                                        ), range: -2.0...1.5, text: String(format: "%+.1f EV", camera.exposureEV))
-                                        
-                                        glassSliderRow(title: "S-CURVE", value: $camera.contrastSCurve, range: 0.0...1.0, text: String(format: "%.2f", camera.contrastSCurve * 4.0))
-                                        
-                                        glassSliderRow(title: "MATTE FADE", value: $camera.fadeMatteAmount, range: 0.0...1.0, text: "\(Int(camera.fadeMatteAmount * 100))%")
-                                        
-                                        glassSliderRow(title: "TEMP (WB)", value: $camera.warmth, range: -1.0...1.0, text: String(format: "%+.1f", camera.warmth))
-                                    } else if activeDrawerTab == 1 {
-                                        glassSliderRow(title: "HALATION", value: $camera.bloomIntensity, range: 0.0...1.0, text: "\(Int(camera.bloomIntensity * 100))%")
-                                        
-                                        glassSliderRow(title: "GRANO 35MM", value: $camera.grainIntensity, range: 0.0...1.0, text: "\(Int(camera.grainIntensity * 100))%")
-                                        
-                                        glassSliderRow(title: "VIÑETEADO", value: $camera.vignetteIntensity, range: 0.0...1.0, text: "\(Int(camera.vignetteIntensity * 100))%")
-                                    } else {
-                                        HStack(spacing: 6) {
-                                            ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
-                                                Button {
-                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                                    camera.aspectRatio = ratio
-                                                } label: {
-                                                    Text(ratio.rawValue)
-                                                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                                                        .lineLimit(1)
-                                                        .fixedSize(horizontal: true, vertical: false)
-                                                        .foregroundStyle(camera.aspectRatio == ratio ? .black : .white)
-                                                        .frame(maxWidth: .infinity)
-                                                        .padding(.vertical, 6)
-                                                        .background(camera.aspectRatio == ratio ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                                        .clipShape(Capsule())
-                                                }
-                                            }
-                                        }
-                                        
-                                        HStack(spacing: 6) {
-                                            ForEach(FrameStyleOption.allCases, id: \.self) { style in
-                                                Button {
-                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                                    camera.frameStyle = style
-                                                } label: {
-                                                    Text(style.rawValue)
-                                                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                                        .lineLimit(1)
-                                                        .fixedSize(horizontal: true, vertical: false)
-                                                        .foregroundStyle(camera.frameStyle == style ? .black : .white)
-                                                        .frame(maxWidth: .infinity)
-                                                        .padding(.vertical, 6)
-                                                        .background(camera.frameStyle == style ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                                        .clipShape(Capsule())
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(.ultraThinMaterial)
-                                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.18), lineWidth: 0.7))
-                                .padding(.horizontal, 26)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                            }
-                            
-                            // Botones de Lentes (.5 | 1x | 2x | 3x)
-                            HStack(spacing: 6) {
-                                ForEach(zoomLevels, id: \.self) { level in
-                                    Button {
-                                        camera.switchCameraLens(factor: level)
-                                    } label: {
-                                        Text(level == 0.5 ? ".5" : "\(Int(level))×")
-                                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                                            .lineLimit(1)
-                                            .fixedSize(horizontal: true, vertical: false)
-                                            .foregroundStyle(camera.currentZoom == level ? camera.selectedProfile.badgeColor : .white)
-                                            .frame(width: 34, height: 34)
-                                            .background(camera.currentZoom == level ? Color.black.opacity(0.65) : Color.clear)
-                                            .clipShape(Circle())
-                                    }
-                                }
-                            }
-                            .padding(4)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.5))
-                            .padding(.bottom, 10)
-                        }
-                    }
-                    .frame(width: outerGeo.size.width, height: outerGeo.size.height)
-                }
-                
-                // 3. Selector de las 16 Cámaras en Cápsulas Liquid Glass
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(FilmProfile.allCases) { profile in
-                            Button {
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                                    camera.selectProfile(profile)
-                                }
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(camera.selectedProfile == profile ? .black : profile.badgeColor)
-                                        .frame(width: 7, height: 7)
-                                    Text(profile.rawValue)
-                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                        .lineLimit(1)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                }
-                                .foregroundStyle(camera.selectedProfile == profile ? .black : .white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(camera.selectedProfile == profile ? profile.badgeColor : Color.white.opacity(0.12))
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(camera.selectedProfile == profile ? 0.0 : 0.14), lineWidth: 0.6)
-                                )
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                }
-                
-                // 4. Barra de Obturador Liquid Glass
-                HStack {
-                    Button {
-                        if camera.capturedImage != nil {
-                            showFullPreview = true
-                        }
-                    } label: {
-                        if let lastPhoto = camera.capturedImage {
-                            Image(uiImage: lastPhoto)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 52, height: 52)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.35), lineWidth: 1))
-                        } else {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(.ultraThinMaterial)
-                                .frame(width: 52, height: 52)
-                                .overlay(
-                                    Image(systemName: "photo.on.rectangle")
-                                        .font(.system(size: 18))
-                                        .foregroundStyle(.white.opacity(0.6))
-                                )
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.14), lineWidth: 0.6))
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Button {
-                        camera.triggerShutter()
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .stroke(camera.selectedProfile.badgeColor, lineWidth: 3.5)
-                                .frame(width: 76, height: 76)
-                            Circle()
-                                .fill(camera.isProcessing ? camera.selectedProfile.badgeColor : Color.white)
-                                .frame(width: 64, height: 64)
-                                .scaleEffect(camera.isProcessing ? 0.88 : 1.0)
-                                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: camera.isProcessing)
-                        }
-                    }
-                    .disabled(camera.isProcessing)
-                    
-                    Spacer()
-                    
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        VStack(spacing: 2) {
-                            Image(systemName: "slider.horizontal.below.rectangle")
-                                .font(.system(size: 17, weight: .semibold))
-                            Text("STUDIO")
-                                .font(.system(size: 8, weight: .bold, design: .rounded))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundStyle(.white)
-                        .frame(width: 52, height: 52)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(camera.selectedProfile.badgeColor.opacity(0.55), lineWidth: 0.9)
-                        )
-                    }
-                }
-                .padding(.horizontal, 26)
-                .padding(.bottom, 12)
+                topBarView
+                viewfinderSection
+                filmCarouselView
+                bottomShutterBarView
             }
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
@@ -2726,42 +2222,543 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showFullPreview) {
-            if let img = camera.capturedImage {
-                ZStack(alignment: .top) {
-                    Color.black.ignoresSafeArea()
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            fullPreviewSheet
+        }
+    }
+    
+    // MARK: - Subvistas Modulares (Garantizan compilación instantánea y soporte Horizontal)
+    private var topBarView: some View {
+        HStack(spacing: 10) {
+            Button {
+                camera.toggleSensorMode()
+            } label: {
+                Text(modeButtonTitle)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(camera.useRAWCapture || camera.use48MPMode ? camera.selectedProfile.badgeColor : Color.white.opacity(0.15))
+                    .foregroundStyle(camera.useRAWCapture || camera.use48MPMode ? .black : .white)
+                    .clipShape(Capsule())
+            }
+            
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                camera.flashEnabled.toggle()
+            } label: {
+                Image(systemName: camera.flashEnabled ? "bolt.fill" : "bolt.slash")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(camera.flashEnabled ? .yellow : .white.opacity(0.85))
+                    .frame(width: 34, height: 34)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(Circle())
+                    .rotationEffect(.degrees(camera.uiRotationDegrees))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
+            }
+            
+            Spacer(minLength: 4)
+            
+            HStack(spacing: 6) {
+                Text("oCam")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .foregroundStyle(.white.opacity(0.95))
+                
+                if camera.timerSeconds > 0 {
+                    Text("\(camera.timerSeconds)s")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.yellow)
+                        .clipShape(Capsule())
+                }
+            }
+            
+            Spacer(minLength: 4)
+            
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showExposureBar.toggle()
+                    if showExposureBar { showTray = false }
+                }
+            } label: {
+                Image(systemName: "plusminus.circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(showExposureBar ? camera.selectedProfile.badgeColor : .white.opacity(0.85))
+                    .frame(width: 34, height: 34)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(Circle())
+                    .rotationEffect(.degrees(camera.uiRotationDegrees))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
+            }
+            
+            extraFeaturesMenu
+            
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                    showTray.toggle()
+                    if showTray { showExposureBar = false }
+                }
+            } label: {
+                Image(systemName: showTray ? "chevron.down" : "chevron.up")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(showTray ? .black : .white)
+                    .frame(width: 34, height: 34)
+                    .background(showTray ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.6))
+        .padding(.horizontal, 16)
+    }
+    
+    private var extraFeaturesMenu: some View {
+        Menu {
+            Button("Temporizador: OFF") { camera.timerSeconds = 0 }
+            Button("Temporizador: 3s") { camera.timerSeconds = 3 }
+            Button("Temporizador: 10s") { camera.timerSeconds = 10 }
+            
+            Divider()
+            
+            Button(camera.nightModeEnabled ? "Modo Noche: ON" : "Activar Modo Noche") {
+                camera.nightModeEnabled.toggle()
+                camera.updateNightModeHardware()
+            }
+            Button(camera.portraitDepthBlur > 0.05 ? "Modo Retrato (f/1.4): ON" : "Activar Modo Retrato (f/1.4)") {
+                camera.portraitDepthBlur = (camera.portraitDepthBlur > 0.05) ? 0.0 : 0.65
+            }
+            Button(camera.doubleExposureEnabled ? "Doble Exposición (2X): ON" : "Activar Doble Exposición (2X)") {
+                camera.doubleExposureEnabled.toggle()
+                if !camera.doubleExposureEnabled { camera.doubleExposureFirstShot = nil }
+            }
+            Button(camera.anamorphicMode ? "Destello Anamórfico: ON" : "Activar Destello Anamórfico") {
+                camera.anamorphicMode.toggle()
+            }
+            
+            Divider()
+            
+            Button(camera.dateStampEnabled ? "Fechador '98: ON" : "Activar Fechador '98") {
+                camera.dateStampEnabled.toggle()
+            }
+            Button(camera.lightLeakEnabled ? "Light Leak: ON" : "Activar Light Leak") {
+                camera.lightLeakEnabled.toggle()
+            }
+            Button(camera.showGrid ? "Ocultar Cuadrícula" : "Mostrar Cuadrícula") {
+                camera.showGrid.toggle()
+            }
+            Button(camera.showHorizonAndHistogram ? "Ocultar Nivel Horizonte" : "Mostrar Nivel Horizonte") {
+                camera.showHorizonAndHistogram.toggle()
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(hasExtraFeaturesActive ? .black : .white)
+                .frame(width: 34, height: 34)
+                .background(hasExtraFeaturesActive ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                .clipShape(Circle())
+                .rotationEffect(.degrees(camera.uiRotationDegrees))
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
+        }
+    }
+    
+    private var viewfinderSection: some View {
+        GeometryReader { outerGeo in
+            let sideMargin: CGFloat = 36.0
+            let availW = max(100, outerGeo.size.width - sideMargin)
+            let availH = max(100, outerGeo.size.height - 6)
+            let targetRatio = camera.aspectRatio.portraitRatio
+            let frameW = min(availW, availH * targetRatio)
+            let frameH = min(availH, frameW / targetRatio)
+            
+            ZStack {
+                ZStack {
+                    NativeCameraPreview(session: camera.session) { devicePt, viewPt in
+                        camera.focusAt(normalizedPoint: devicePt, viewPoint: viewPt)
+                    }
+                    .contrast(liveContrast(for: camera.selectedProfile) + Double(camera.contrastSCurve) * 0.12)
+                    .saturation(max(0.0, liveSaturation(for: camera.selectedProfile) + Double(camera.saturationAdjust) * 0.35))
                     
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("oCam • \(camera.selectedProfile.rawValue)")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.white)
-                            Text(camera.lastExifSummary)
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.75))
+                    LiveOpticalEffectsView(
+                        profile: camera.selectedProfile,
+                        contrastSCurve: camera.contrastSCurve,
+                        fadeMatteAmount: camera.fadeMatteAmount,
+                        vignetteIntensity: camera.vignetteIntensity,
+                        grainIntensity: camera.grainIntensity,
+                        bloomIntensity: camera.bloomIntensity,
+                        warmth: camera.warmth,
+                        portraitDepthBlur: camera.portraitDepthBlur,
+                        lightLeakEnabled: camera.lightLeakEnabled,
+                        anamorphicMode: camera.anamorphicMode,
+                        dateStampEnabled: camera.dateStampEnabled,
+                        frameStyle: camera.frameStyle,
+                        doubleExposureGhost: camera.doubleExposureFirstShot
+                    )
+                    
+                    if camera.showGrid {
+                        GridOverlayView(
+                            showHorizon: camera.showHorizonAndHistogram,
+                            horizonDegrees: camera.horizonAngleDegrees
+                        )
+                    }
+                    
+                    if let pt = camera.focusPoint {
+                        HStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(camera.selectedProfile.badgeColor, lineWidth: 1.5)
+                                .frame(width: 62, height: 62)
+                            
+                            Image(systemName: "sun.max.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(camera.selectedProfile.badgeColor)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                        .position(pt)
+                    }
+                    
+                    if camera.countdownRemaining > 0 {
+                        Text("\(camera.countdownRemaining)")
+                            .font(.system(size: 72, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .shadow(radius: 10)
+                    }
+                }
+                .frame(width: frameW, height: frameH)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.20), lineWidth: 0.9)
+                )
+                .shadow(color: .black.opacity(0.5), radius: 12)
+                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: camera.aspectRatio)
+                
+                VStack {
+                    HStack(spacing: 6) {
+                        Text("\(camera.selectedProfile.rawValue) • \(camera.statusMessage)")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .foregroundStyle(.white.opacity(0.92))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.top, 12)
+                    
+                    Spacer()
+                    
+                    if showExposureBar {
+                        HStack(spacing: 12) {
+                            Image(systemName: "sun.min.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.7))
+                            Slider(value: Binding(
+                                get: { camera.exposureEV },
+                                set: { camera.setExposure($0) }
+                            ), in: -2.0...1.5)
+                            .tint(camera.selectedProfile.badgeColor)
+                            Text(String(format: "%+.1f EV", camera.exposureEV))
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .foregroundStyle(camera.selectedProfile.badgeColor)
+                                .frame(width: 54)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
-                        
-                        Spacer()
-                        
-                        Button("Done") {
-                            showFullPreview = false
-                        }
-                        .font(.system(size: 14, weight: .bold))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(camera.selectedProfile.badgeColor)
-                        .clipShape(Capsule())
-                        .foregroundStyle(.black)
+                        .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.6))
+                        .padding(.horizontal, 28)
                     }
-                    .padding(20)
+                    
+                    if showTray {
+                        controlsDrawerView
+                    }
+                    
+                    HStack(spacing: 6) {
+                        ForEach(zoomLevels, id: \.self) { level in
+                            Button {
+                                camera.switchCameraLens(factor: level)
+                            } label: {
+                                Text(level == 0.5 ? ".5" : "\(Int(level))×")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .foregroundStyle(camera.currentZoom == level ? camera.selectedProfile.badgeColor : .white)
+                                    .frame(width: 34, height: 34)
+                                    .background(camera.currentZoom == level ? Color.black.opacity(0.65) : Color.clear)
+                                    .clipShape(Circle())
+                                    .rotationEffect(.degrees(camera.uiRotationDegrees))
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
+                            }
+                        }
+                    }
+                    .padding(4)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.5))
+                    .padding(.bottom, 10)
                 }
+            }
+            .frame(width: outerGeo.size.width, height: outerGeo.size.height)
+        }
+    }
+    
+    private var controlsDrawerView: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                trayTabPill(index: 0, title: "Tone")
+                trayTabPill(index: 1, title: "Grain")
+                trayTabPill(index: 2, title: "Format")
+                
+                Spacer(minLength: 4)
+                
+                Menu {
+                    Button("Recomendado para \(camera.selectedProfile.rawValue)", systemImage: "sparkles") {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        camera.applyRecommendedForCurrentProfile()
+                    }
+                    Button("Por defecto (Neutro)", systemImage: "arrow.counterclockwise") {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        camera.resetToNeutral()
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.uturn.backward")
+                        Text("Reset")
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(camera.selectedProfile.badgeColor)
+                    .clipShape(Capsule())
+                }
+            }
+            
+            if activeDrawerTab == 0 {
+                glassSliderRow(title: "EXPOSICIÓN", value: Binding(
+                    get: { camera.exposureEV },
+                    set: { camera.setExposure($0) }
+                ), range: -2.0...1.5, text: String(format: "%+.1f EV", camera.exposureEV))
+                
+                glassSliderRow(title: "S-CURVE", value: $camera.contrastSCurve, range: 0.0...1.0, text: String(format: "%.2f", camera.contrastSCurve * 4.0))
+                
+                glassSliderRow(title: "MATTE FADE", value: $camera.fadeMatteAmount, range: 0.0...1.0, text: "\(Int(camera.fadeMatteAmount * 100))%")
+                
+                glassSliderRow(title: "TEMP (WB)", value: $camera.warmth, range: -1.0...1.0, text: String(format: "%+.1f", camera.warmth))
+            } else if activeDrawerTab == 1 {
+                glassSliderRow(title: "HALATION", value: $camera.bloomIntensity, range: 0.0...1.0, text: "\(Int(camera.bloomIntensity * 100))%")
+                
+                glassSliderRow(title: "GRANO 35MM", value: $camera.grainIntensity, range: 0.0...1.0, text: "\(Int(camera.grainIntensity * 100))%")
+                
+                glassSliderRow(title: "VIÑETEADO", value: $camera.vignetteIntensity, range: 0.0...1.0, text: "\(Int(camera.vignetteIntensity * 100))%")
+            } else {
+                HStack(spacing: 6) {
+                    ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            camera.aspectRatio = ratio
+                        } label: {
+                            Text(ratio.rawValue)
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .foregroundStyle(camera.aspectRatio == ratio ? .black : .white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(camera.aspectRatio == ratio ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                
+                HStack(spacing: 6) {
+                    ForEach(FrameStyleOption.allCases, id: \.self) { style in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            camera.frameStyle = style
+                        } label: {
+                            Text(style.rawValue)
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .foregroundStyle(camera.frameStyle == style ? .black : .white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(camera.frameStyle == style ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.18), lineWidth: 0.7))
+        .padding(.horizontal, 26)
+    }
+    
+    private var filmCarouselView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(FilmProfile.allCases) { profile in
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                            camera.selectProfile(profile)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(camera.selectedProfile == profile ? .black : profile.badgeColor)
+                                .frame(width: 7, height: 7)
+                            Text(profile.rawValue)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .foregroundStyle(camera.selectedProfile == profile ? .black : .white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(camera.selectedProfile == profile ? profile.badgeColor : Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(camera.selectedProfile == profile ? 0.0 : 0.14), lineWidth: 0.6)
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+    
+    private var bottomShutterBarView: some View {
+        HStack {
+            Button {
+                if camera.capturedImage != nil {
+                    showFullPreview = true
+                }
+            } label: {
+                if let lastPhoto = camera.capturedImage {
+                    Image(uiImage: lastPhoto)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 52, height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.35), lineWidth: 1))
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 52, height: 52)
+                        .overlay(
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.white.opacity(0.6))
+                        )
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.14), lineWidth: 0.6))
+                }
+            }
+            .rotationEffect(.degrees(camera.uiRotationDegrees))
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
+            
+            Spacer()
+            
+            Button {
+                camera.triggerShutter()
+            } label: {
+                ZStack {
+                    Circle()
+                        .stroke(camera.selectedProfile.badgeColor, lineWidth: 3.5)
+                        .frame(width: 76, height: 76)
+                    Circle()
+                        .fill(camera.isProcessing ? camera.selectedProfile.badgeColor : Color.white)
+                        .frame(width: 64, height: 64)
+                        .scaleEffect(camera.isProcessing ? 0.88 : 1.0)
+                        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: camera.isProcessing)
+                }
+            }
+            .disabled(camera.isProcessing)
+            
+            Spacer()
+            
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                VStack(spacing: 2) {
+                    Image(systemName: "slider.horizontal.below.rectangle")
+                        .font(.system(size: 17, weight: .semibold))
+                    Text("STUDIO")
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .foregroundStyle(.white)
+                .frame(width: 52, height: 52)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(camera.selectedProfile.badgeColor.opacity(0.55), lineWidth: 0.9)
+                )
+            }
+            .rotationEffect(.degrees(camera.uiRotationDegrees))
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
+        }
+        .padding(.horizontal, 26)
+        .padding(.bottom, 12)
+    }
+    
+    @ViewBuilder
+    private var fullPreviewSheet: some View {
+        if let img = camera.capturedImage {
+            ZStack(alignment: .top) {
+                Color.black.ignoresSafeArea()
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("oCam • \(camera.selectedProfile.rawValue)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text(camera.lastExifSummary)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+                    
+                    Spacer()
+                    
+                    Button("Done") {
+                        showFullPreview = false
+                    }
+                    .font(.system(size: 14, weight: .bold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(camera.selectedProfile.badgeColor)
+                    .clipShape(Capsule())
+                    .foregroundStyle(.black)
+                }
+                .padding(20)
             }
         }
     }
