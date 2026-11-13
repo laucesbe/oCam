@@ -19,10 +19,10 @@ struct oCamApp: App {
     }
 }
 
-// MARK: - 1. Catálogo de 16 Cámaras Cinematográficas y Retro de oCam
+// MARK: - 1. Catálogo de 16 Cámaras con Química RGB Independiente
 enum FilmProfile: String, CaseIterable, Identifiable {
-    case ocamMaster = "oCam"
     case cineChrome = "Palms 70s"
+    case ocamMaster = "oCam"
     case kodak2383 = "Kodak 2383"
     case nocturnaClub = "Nocturna"
     case portra400 = "Portra 400"
@@ -42,29 +42,29 @@ enum FilmProfile: String, CaseIterable, Identifiable {
     
     var subtitle: String {
         switch self {
-        case .ocamMaster: return "TRUE COLOR FILM ROLL-OFF"
-        case .cineChrome: return "MAX HALATION • ZERO VIGNETTE"
-        case .kodak2383: return "HOLLYWOOD PRINT LUT"
-        case .nocturnaClub: return "CLUB & NEON LOW LIGHT"
-        case .portra400: return "NATURAL SKIN & SOFT LIGHT"
-        case .cinestill800T: return "TUNGSTEN HALATION"
-        case .dispo98: return "90s POCKET FLASH"
-        case .ccd2004: return "EARLY 2000s DIGICAM"
-        case .polaroid600: return "CREAMY INSTANT FRAME"
-        case .superia400: return "EMERALD SHADOWS"
-        case .velvia50: return "RICH SLIDE CHROME"
-        case .gold200: return "GOLDEN HOUR VINTAGE"
-        case .aerochrome: return "INFRARED CRIMSON FOLIAGE"
-        case .bleachBypass: return "METALLIC CINEMA GRIT"
-        case .ilfordHP5: return "SOFT DOCUMENTARY B&W"
-        case .triX400: return "HIGH CONTRAST MONO"
+        case .cineChrome: return "70s CREAM SKY & DEEP PINE"
+        case .ocamMaster: return "NATURAL CINEMA ROLL-OFF"
+        case .kodak2383: return "HOLLYWOOD TEAL & GOLD"
+        case .nocturnaClub: return "NEON & DARK CLUB"
+        case .portra400: return "WARM SKIN & GOLDEN LIGHT"
+        case .cinestill800T: return "TUNGSTEN CYAN NIGHT"
+        case .dispo98: return "90s GREEN SHADOW FLASH"
+        case .ccd2004: return "Y2K CRISP DIGICAM"
+        case .polaroid600: return "VINTAGE CREAM INSTANT"
+        case .superia400: return "FUJI EMERALD & MAGENTA"
+        case .velvia50: return "VIVID CHROME SLIDE"
+        case .gold200: return "70s CALIFORNIA SUNSET"
+        case .aerochrome: return "INFRARED CRIMSON TREES"
+        case .bleachBypass: return "SILVER METALLIC GRIT"
+        case .ilfordHP5: return "DOCUMENTARY B&W"
+        case .triX400: return "CLASSIC DARKROOM B&W"
         }
     }
     
     var badgeColor: Color {
         switch self {
-        case .ocamMaster: return Color(red: 0.92, green: 0.84, blue: 0.70)
         case .cineChrome: return Color(red: 0.94, green: 0.76, blue: 0.48)
+        case .ocamMaster: return Color(red: 0.92, green: 0.84, blue: 0.70)
         case .kodak2383: return Color(red: 0.48, green: 0.82, blue: 0.86)
         case .nocturnaClub: return Color(red: 0.96, green: 0.52, blue: 0.40)
         case .portra400: return Color(red: 0.94, green: 0.70, blue: 0.52)
@@ -85,6 +85,11 @@ enum FilmProfile: String, CaseIterable, Identifiable {
     struct RecommendedSettings {
         let ev: Float
         let contrastSCurve: Float
+        let shadowCrush: Float
+        let creamHighlights: Float
+        let redTrim: Float
+        let greenTrim: Float
+        let blueTrim: Float
         let warmth: Float
         let bloom: Float
         let grain: Float
@@ -96,39 +101,117 @@ enum FilmProfile: String, CaseIterable, Identifiable {
     
     var recommended: RecommendedSettings {
         switch self {
-        case .ocamMaster:
-            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.65, warmth: 0.0, bloom: 0.30, grain: 0.24, vignette: 0.20, fadeMatte: 0.14, saturationAdjust: -0.10, nightMode: false)
         case .cineChrome:
-            // Palms 70s por defecto: Viñeta en 0% (0.0) y Halation al máximo (100% / 1.0)
-            return RecommendedSettings(ev: -0.40, contrastSCurve: 0.74, warmth: 0.06, bloom: 1.00, grain: 0.30, vignette: 0.00, fadeMatte: 0.22, saturationAdjust: -0.16, nightMode: false)
+            // CLON 1:1 DE LA FOTO DE LAS PALMERAS DE REFERENCIA:
+            // Cielo crema cálido (blueTrim negativo + creamHighlights alto), palmeras verde pino oscuro (shadowCrush alto + greenTrim negativo),
+            // Viñeta en 0.0 (0%) y Halation al máximo (1.0 / 100%)
+            return RecommendedSettings(
+                ev: -0.45, contrastSCurve: 0.82, shadowCrush: 0.48, creamHighlights: 0.68,
+                redTrim: 0.18, greenTrim: -0.22, blueTrim: -0.42,
+                warmth: 0.14, bloom: 1.00, grain: 0.32, vignette: 0.00, fadeMatte: 0.18, saturationAdjust: -0.24, nightMode: false
+            )
+        case .ocamMaster:
+            return RecommendedSettings(
+                ev: -0.35, contrastSCurve: 0.68, shadowCrush: 0.25, creamHighlights: 0.32,
+                redTrim: 0.06, greenTrim: -0.08, blueTrim: -0.15,
+                warmth: 0.04, bloom: 0.35, grain: 0.24, vignette: 0.18, fadeMatte: 0.14, saturationAdjust: -0.12, nightMode: false
+            )
         case .kodak2383:
-            return RecommendedSettings(ev: -0.40, contrastSCurve: 0.78, warmth: 0.0, bloom: 0.34, grain: 0.26, vignette: 0.28, fadeMatte: 0.18, saturationAdjust: -0.08, nightMode: false)
+            // Print Film de Hollywood: Sombras densas cian/petróleo y altas luces doradas
+            return RecommendedSettings(
+                ev: -0.40, contrastSCurve: 0.84, shadowCrush: 0.42, creamHighlights: 0.55,
+                redTrim: 0.12, greenTrim: -0.06, blueTrim: -0.25,
+                warmth: 0.05, bloom: 0.40, grain: 0.26, vignette: 0.28, fadeMatte: 0.15, saturationAdjust: -0.10, nightMode: false
+            )
         case .nocturnaClub:
-            return RecommendedSettings(ev: -0.55, contrastSCurve: 0.72, warmth: -0.04, bloom: 0.75, grain: 0.32, vignette: 0.32, fadeMatte: 0.12, saturationAdjust: -0.05, nightMode: true)
+            // Boliche / Bar oscuro: Negros profundos, neones intensos y halation alta
+            return RecommendedSettings(
+                ev: -0.60, contrastSCurve: 0.78, shadowCrush: 0.38, creamHighlights: 0.25,
+                redTrim: 0.14, greenTrim: -0.12, blueTrim: 0.10,
+                warmth: 0.0, bloom: 0.82, grain: 0.34, vignette: 0.32, fadeMatte: 0.10, saturationAdjust: 0.05, nightMode: true
+            )
         case .portra400:
-            return RecommendedSettings(ev: -0.25, contrastSCurve: 0.54, warmth: 0.03, bloom: 0.26, grain: 0.22, vignette: 0.16, fadeMatte: 0.16, saturationAdjust: -0.06, nightMode: false)
+            // Kodak Portra 400: Pieles cálidas luminosas, verdes suaves y roll-off pastel
+            return RecommendedSettings(
+                ev: -0.25, contrastSCurve: 0.58, shadowCrush: 0.18, creamHighlights: 0.48,
+                redTrim: 0.16, greenTrim: -0.05, blueTrim: -0.22,
+                warmth: 0.12, bloom: 0.30, grain: 0.22, vignette: 0.14, fadeMatte: 0.18, saturationAdjust: -0.06, nightMode: false
+            )
         case .cinestill800T:
-            return RecommendedSettings(ev: -0.45, contrastSCurve: 0.68, warmth: -0.14, bloom: 0.85, grain: 0.34, vignette: 0.28, fadeMatte: 0.12, saturationAdjust: -0.06, nightMode: true)
+            // Tungsteno nocturno: Frío azulado/cian en sombras y halos rojizos en luces
+            return RecommendedSettings(
+                ev: -0.45, contrastSCurve: 0.72, shadowCrush: 0.30, creamHighlights: 0.10,
+                redTrim: -0.12, greenTrim: 0.04, blueTrim: 0.32,
+                warmth: -0.24, bloom: 0.88, grain: 0.34, vignette: 0.28, fadeMatte: 0.12, saturationAdjust: -0.04, nightMode: true
+            )
         case .dispo98:
-            return RecommendedSettings(ev: -0.20, contrastSCurve: 0.70, warmth: 0.0, bloom: 0.35, grain: 0.50, vignette: 0.38, fadeMatte: 0.28, saturationAdjust: -0.08, nightMode: false)
+            // Desechable años 90: Sombras lavadas verdosas y luces cálidas de flash
+            return RecommendedSettings(
+                ev: -0.20, contrastSCurve: 0.74, shadowCrush: 0.15, creamHighlights: 0.42,
+                redTrim: 0.05, greenTrim: 0.22, blueTrim: -0.28,
+                warmth: 0.06, bloom: 0.40, grain: 0.52, vignette: 0.42, fadeMatte: 0.32, saturationAdjust: -0.10, nightMode: false
+            )
         case .ccd2004:
-            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.62, warmth: 0.0, bloom: 0.16, grain: 0.18, vignette: 0.20, fadeMatte: 0.05, saturationAdjust: 0.06, nightMode: false)
+            // Digicam Y2K: Contraste digital marcado y azules profundos
+            return RecommendedSettings(
+                ev: -0.30, contrastSCurve: 0.70, shadowCrush: 0.30, creamHighlights: 0.0,
+                redTrim: 0.04, greenTrim: -0.04, blueTrim: 0.14,
+                warmth: -0.05, bloom: 0.15, grain: 0.18, vignette: 0.20, fadeMatte: 0.04, saturationAdjust: 0.12, nightMode: false
+            )
         case .polaroid600:
-            return RecommendedSettings(ev: -0.15, contrastSCurve: 0.48, warmth: 0.04, bloom: 0.42, grain: 0.28, vignette: 0.34, fadeMatte: 0.34, saturationAdjust: -0.14, nightMode: false)
+            // Instantánea vintage: Sombras mate levantadas y marco crema cálido
+            return RecommendedSettings(
+                ev: -0.15, contrastSCurve: 0.52, shadowCrush: 0.10, creamHighlights: 0.62,
+                redTrim: 0.20, greenTrim: 0.02, blueTrim: -0.35,
+                warmth: 0.16, bloom: 0.48, grain: 0.30, vignette: 0.36, fadeMatte: 0.38, saturationAdjust: -0.18, nightMode: false
+            )
         case .superia400:
-            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.64, warmth: 0.0, bloom: 0.24, grain: 0.28, vignette: 0.22, fadeMatte: 0.14, saturationAdjust: -0.05, nightMode: false)
+            // Fuji Superia: Verdes esmeralda intensos y sombras con tinte magenta sutil
+            return RecommendedSettings(
+                ev: -0.35, contrastSCurve: 0.68, shadowCrush: 0.28, creamHighlights: 0.25,
+                redTrim: 0.08, greenTrim: 0.16, blueTrim: -0.12,
+                warmth: 0.0, bloom: 0.28, grain: 0.30, vignette: 0.24, fadeMatte: 0.14, saturationAdjust: -0.04, nightMode: false
+            )
         case .velvia50:
-            return RecommendedSettings(ev: -0.40, contrastSCurve: 0.76, warmth: 0.0, bloom: 0.20, grain: 0.16, vignette: 0.24, fadeMatte: 0.06, saturationAdjust: 0.12, nightMode: false)
+            // Diapositiva Fuji: Negros profundos y colores vibrantes de paisaje
+            return RecommendedSettings(
+                ev: -0.45, contrastSCurve: 0.82, shadowCrush: 0.45, creamHighlights: 0.15,
+                redTrim: 0.14, greenTrim: 0.08, blueTrim: 0.12,
+                warmth: 0.04, bloom: 0.22, grain: 0.16, vignette: 0.28, fadeMatte: 0.05, saturationAdjust: 0.22, nightMode: false
+            )
         case .gold200:
-            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.62, warmth: 0.06, bloom: 0.32, grain: 0.26, vignette: 0.22, fadeMatte: 0.20, saturationAdjust: -0.04, nightMode: false)
+            // Kodak Gold 200: Hora dorada californiana cálida y nostálgica
+            return RecommendedSettings(
+                ev: -0.30, contrastSCurve: 0.66, shadowCrush: 0.26, creamHighlights: 0.58,
+                redTrim: 0.22, greenTrim: 0.04, blueTrim: -0.34,
+                warmth: 0.18, bloom: 0.36, grain: 0.28, vignette: 0.24, fadeMatte: 0.20, saturationAdjust: -0.04, nightMode: false
+            )
         case .aerochrome:
-            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.70, warmth: 0.0, bloom: 0.35, grain: 0.26, vignette: 0.24, fadeMatte: 0.10, saturationAdjust: 0.05, nightMode: false)
+            // Infrarrojo Kodak: Follaje carmesí y cielos dramáticos
+            return RecommendedSettings(
+                ev: -0.35, contrastSCurve: 0.74, shadowCrush: 0.35, creamHighlights: 0.20,
+                redTrim: 0.45, greenTrim: -0.35, blueTrim: -0.10,
+                warmth: 0.0, bloom: 0.38, grain: 0.26, vignette: 0.26, fadeMatte: 0.10, saturationAdjust: 0.08, nightMode: false
+            )
         case .bleachBypass:
-            return RecommendedSettings(ev: -0.45, contrastSCurve: 0.82, warmth: -0.05, bloom: 0.14, grain: 0.44, vignette: 0.40, fadeMatte: 0.15, saturationAdjust: -0.48, nightMode: false)
+            // Retención de plata: Contraste metálico implacable y baja saturación
+            return RecommendedSettings(
+                ev: -0.45, contrastSCurve: 0.88, shadowCrush: 0.52, creamHighlights: 0.30,
+                redTrim: -0.05, greenTrim: -0.05, blueTrim: -0.10,
+                warmth: -0.06, bloom: 0.18, grain: 0.46, vignette: 0.42, fadeMatte: 0.14, saturationAdjust: -0.55, nightMode: false
+            )
         case .ilfordHP5:
-            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.56, warmth: 0.0, bloom: 0.22, grain: 0.46, vignette: 0.28, fadeMatte: 0.22, saturationAdjust: -1.0, nightMode: false)
+            return RecommendedSettings(
+                ev: -0.30, contrastSCurve: 0.60, shadowCrush: 0.22, creamHighlights: 0.25,
+                redTrim: 0.0, greenTrim: 0.0, blueTrim: 0.0,
+                warmth: 0.0, bloom: 0.24, grain: 0.48, vignette: 0.28, fadeMatte: 0.24, saturationAdjust: -1.0, nightMode: false
+            )
         case .triX400:
-            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.80, warmth: 0.0, bloom: 0.20, grain: 0.58, vignette: 0.36, fadeMatte: 0.10, saturationAdjust: -1.0, nightMode: false)
+            return RecommendedSettings(
+                ev: -0.40, contrastSCurve: 0.84, shadowCrush: 0.48, creamHighlights: 0.15,
+                redTrim: 0.0, greenTrim: 0.0, blueTrim: 0.0,
+                warmth: 0.0, bloom: 0.22, grain: 0.60, vignette: 0.38, fadeMatte: 0.10, saturationAdjust: -1.0, nightMode: false
+            )
         }
     }
 }
@@ -172,7 +255,7 @@ struct DevelopedPhotoResult {
     let exifSummary: String
 }
 
-// MARK: - 2. Motor Cinematográfico oCam
+// MARK: - 2. Motor de Emulsión Química por Canales R-G-B Independientes (Clon Exacto de Referencia)
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
@@ -187,6 +270,11 @@ class CinematicPipeline {
         to input: CIImage,
         profile: FilmProfile,
         contrastSCurve: Float,
+        shadowCrush: Float = 0.35,
+        creamHighlights: Float = 0.45,
+        redTrim: Float = 0.0,
+        greenTrim: Float = 0.0,
+        blueTrim: Float = 0.0,
         bloomAmount: Float,
         grainAmount: Float,
         vignetteAmount: Float,
@@ -208,6 +296,7 @@ class CinematicPipeline {
         guard extent.width > 0, extent.height > 0 else { return input }
         let scaleMultiplier = max(1.0, min(extent.width, extent.height) / 1080.0)
         
+        // 0. Exposición Base
         if abs(exposureAdjust) > 0.02 {
             let exp = CIFilter.exposureAdjust()
             exp.inputImage = current
@@ -215,6 +304,7 @@ class CinematicPipeline {
             if let out = exp.outputImage?.cropped(to: extent) { current = out }
         }
         
+        // 1. Neutralización Bayer RAW + Reducción de Ruido
         if isRAW {
             let rawGreenFix = CIFilter.colorMatrix()
             rawGreenFix.inputImage = current
@@ -230,171 +320,189 @@ class CinematicPipeline {
             if let out = nr.outputImage?.cropped(to: extent) { current = out }
         }
         
-        if abs(warmthAdjust) > 0.02 {
+        // 2. Temperatura de Color (WB)
+        if abs(warmthAdjust) > 0.01 {
             let wbFix = CIFilter.temperatureAndTint()
             wbFix.inputImage = current
             wbFix.neutral = CIVector(x: 6500, y: 0)
-            let userShift = CGFloat(-warmthAdjust * 850)
+            let userShift = CGFloat(-warmthAdjust * 1150)
             wbFix.targetNeutral = CIVector(x: 6500 + userShift, y: 0)
             if let out = wbFix.outputImage?.cropped(to: extent) { current = out }
         }
         
+        // 3. Compresión de Altas Luces (Highlight Roll-off para apagar el brillo digital del cielo)
         let hs = CIFilter.highlightShadowAdjust()
         hs.inputImage = current
-        let baseHighlight: Float = nightModeBoost ? 0.22 : 0.32
-        let baseShadow: Float = nightModeBoost ? 0.30 : (isRAW ? 0.14 : 0.08)
-        hs.highlightAmount = max(0.05, min(1.0, baseHighlight - (highlightsAdjust * 0.35)))
+        let baseHighlight: Float = nightModeBoost ? 0.18 : 0.22
+        let baseShadow: Float = nightModeBoost ? 0.28 : (isRAW ? 0.12 : 0.04)
+        hs.highlightAmount = max(0.02, min(1.0, baseHighlight - (highlightsAdjust * 0.35)))
         hs.shadowAmount = max(-0.5, min(1.0, baseShadow + (shadowsAdjust * 0.50)))
-        hs.radius = Float(26.0 * scaleMultiplier)
+        hs.radius = Float(28.0 * scaleMultiplier)
         if let out = hs.outputImage?.cropped(to: extent) { current = out }
         
-        let vibrance = CIFilter.vibrance()
-        vibrance.inputImage = current
-        let colorControls = CIFilter.colorControls()
+        // 4. QUÍMICA ESPECÍFICA DE CADA PELÍCULA + DENSIDAD DE FOLLAJE (El secreto de las Palmeras de Referencia)
         let matrix = CIFilter.colorMatrix()
+        matrix.inputImage = current
         
         switch profile {
-        case .ocamMaster:
-            vibrance.amount = -0.14
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.88 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.04
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
-            
-            matrix.inputImage = current
-            matrix.rVector = CIVector(x: 1.02, y: 0.01, z: -0.03, w: 0)
-            matrix.gVector = CIVector(x: -0.01, y: 0.98, z: 0.03, w: 0)
-            matrix.bVector = CIVector(x: -0.02, y: -0.01, z: 1.03, w: 0)
+        case .cineChrome:
+            // PALMS 70s (Clon exacto de image_c6935c.jpg):
+            // - Oscurece la luminancia del verde de las hojas (Substractive Foliage) llevándolo a verde pino profundo/oliva
+            // - Transforma el azul eléctrico del cielo en azul pizarra/petróleo vintage
+            // - Calienta las nubes y las paredes blancas hacia un tono crema analógico de los años 70
+            matrix.rVector = CIVector(x: 1.06, y: -0.08, z: -0.03, w: 0) // Restar verde (y: -0.08) oscurece las hojas verdes
+            matrix.gVector = CIVector(x: 0.02, y: 0.86, z: 0.03, w: 0)  // Baja el verde chillón del iPhone a verde pino
+            matrix.bVector = CIVector(x: -0.04, y: -0.08, z: 0.84, w: 0) // Recorta el azul brillante del cielo a crema/petróleo
+            matrix.biasVector = CIVector(x: 0.012, y: 0.002, z: -0.022, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
-        case .cineChrome:
-            vibrance.amount = -0.20
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.83 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.06
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
-            
-            matrix.inputImage = current
-            matrix.rVector = CIVector(x: 1.03, y: 0.02, z: -0.05, w: 0)
-            matrix.gVector = CIVector(x: -0.02, y: 0.97, z: 0.05, w: 0)
-            matrix.bVector = CIVector(x: -0.03, y: 0.01, z: 1.02, w: 0)
+        case .ocamMaster:
+            matrix.rVector = CIVector(x: 1.04, y: -0.04, z: -0.02, w: 0)
+            matrix.gVector = CIVector(x: 0.01, y: 0.93, z: 0.02, w: 0)
+            matrix.bVector = CIVector(x: -0.02, y: -0.04, z: 0.92, w: 0)
+            matrix.biasVector = CIVector(x: 0.006, y: 0.001, z: -0.010, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .kodak2383:
-            vibrance.amount = -0.10
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.90 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.07
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
-            
-            matrix.inputImage = current
-            matrix.rVector = CIVector(x: 1.03, y: 0.01, z: -0.04, w: 0)
-            matrix.gVector = CIVector(x: 0.00, y: 0.99, z: 0.01, w: 0)
-            matrix.bVector = CIVector(x: -0.03, y: 0.02, z: 1.01, w: 0)
+            // Print Film de Cine: Separación Teal & Gold de laboratorio cinematográfico
+            matrix.rVector = CIVector(x: 1.08, y: -0.06, z: -0.04, w: 0)
+            matrix.gVector = CIVector(x: 0.00, y: 0.94, z: 0.04, w: 0)
+            matrix.bVector = CIVector(x: -0.05, y: 0.04, z: 0.90, w: 0)
+            matrix.biasVector = CIVector(x: 0.008, y: 0.00, z: -0.012, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .nocturnaClub:
-            vibrance.amount = -0.10
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.92 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.08
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            matrix.rVector = CIVector(x: 1.12, y: -0.03, z: -0.02, w: 0)
+            matrix.gVector = CIVector(x: -0.02, y: 0.95, z: 0.03, w: 0)
+            matrix.bVector = CIVector(x: -0.04, y: 0.04, z: 1.04, w: 0)
+            matrix.biasVector = CIVector(x: 0.004, y: -0.008, z: 0.010, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .portra400:
-            vibrance.amount = -0.08
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.92 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.02
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            matrix.rVector = CIVector(x: 1.07, y: -0.03, z: -0.03, w: 0)
+            matrix.gVector = CIVector(x: 0.02, y: 0.94, z: 0.01, w: 0)
+            matrix.bVector = CIVector(x: -0.03, y: -0.04, z: 0.89, w: 0)
+            matrix.biasVector = CIVector(x: 0.010, y: 0.002, z: -0.014, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .cinestill800T:
-            matrix.inputImage = current
-            matrix.rVector = CIVector(x: 0.95, y: 0.03, z: 0.02, w: 0)
-            matrix.gVector = CIVector(x: 0.00, y: 0.99, z: 0.01, w: 0)
-            matrix.bVector = CIVector(x: -0.03, y: 0.03, z: 1.00, w: 0)
+            matrix.rVector = CIVector(x: 0.92, y: 0.02, z: 0.02, w: 0)
+            matrix.gVector = CIVector(x: -0.01, y: 0.98, z: 0.04, w: 0)
+            matrix.bVector = CIVector(x: -0.03, y: 0.05, z: 1.10, w: 0)
+            matrix.biasVector = CIVector(x: -0.010, y: 0.004, z: 0.020, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .dispo98:
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.88 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.08
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            matrix.rVector = CIVector(x: 1.04, y: 0.02, z: -0.04, w: 0)
+            matrix.gVector = CIVector(x: 0.01, y: 1.03, z: 0.01, w: 0)
+            matrix.bVector = CIVector(x: -0.04, y: 0.02, z: 0.86, w: 0)
+            matrix.biasVector = CIVector(x: -0.005, y: 0.018, z: -0.012, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .ccd2004:
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 1.05 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.08
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            matrix.rVector = CIVector(x: 1.03, y: 0.01, z: 0.01, w: 0)
+            matrix.gVector = CIVector(x: 0.00, y: 0.97, z: 0.01, w: 0)
+            matrix.bVector = CIVector(x: 0.01, y: 0.01, z: 1.06, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .polaroid600:
-            vibrance.amount = -0.16
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.85 + saturationAdjust * 0.35)
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            matrix.rVector = CIVector(x: 1.08, y: -0.02, z: -0.02, w: 0)
+            matrix.gVector = CIVector(x: 0.03, y: 0.93, z: 0.00, w: 0)
+            matrix.bVector = CIVector(x: -0.03, y: -0.04, z: 0.82, w: 0)
+            matrix.biasVector = CIVector(x: 0.022, y: 0.008, z: -0.024, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .superia400:
-            matrix.inputImage = current
-            matrix.rVector = CIVector(x: 1.03, y: -0.02, z: -0.01, w: 0)
-            matrix.gVector = CIVector(x: -0.02, y: 1.04, z: -0.02, w: 0)
-            matrix.bVector = CIVector(x: 0.00, y: 0.01, z: 0.99, w: 0)
+            matrix.rVector = CIVector(x: 1.04, y: -0.05, z: 0.03, w: 0)
+            matrix.gVector = CIVector(x: -0.02, y: 1.02, z: 0.01, w: 0)
+            matrix.bVector = CIVector(x: 0.01, y: -0.02, z: 0.94, w: 0)
+            matrix.biasVector = CIVector(x: 0.006, y: -0.004, z: 0.004, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .velvia50:
-            vibrance.amount = 0.12
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 1.08 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.08
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
-            
-        case .gold200:
-            vibrance.amount = -0.06
-            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.93 + saturationAdjust * 0.35)
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
-            
-        case .aerochrome:
-            matrix.inputImage = current
-            matrix.rVector = CIVector(x: 0.45, y: 0.65, z: -0.10, w: 0)
-            matrix.gVector = CIVector(x: 0.25, y: 0.55, z: 0.20, w: 0)
-            matrix.bVector = CIVector(x: -0.05, y: 0.10, z: 0.95, w: 0)
+            matrix.rVector = CIVector(x: 1.08, y: -0.04, z: -0.02, w: 0)
+            matrix.gVector = CIVector(x: -0.02, y: 1.02, z: -0.01, w: 0)
+            matrix.bVector = CIVector(x: -0.03, y: -0.02, z: 1.06, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
-        case .bleachBypass:
-            colorControls.inputImage = current
-            colorControls.saturation = max(0.0, 0.45 + saturationAdjust * 0.35)
-            colorControls.contrast = 1.15
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+        case .gold200:
+            matrix.rVector = CIVector(x: 1.10, y: -0.02, z: -0.03, w: 0)
+            matrix.gVector = CIVector(x: 0.02, y: 0.96, z: -0.02, w: 0)
+            matrix.bVector = CIVector(x: -0.05, y: -0.04, z: 0.84, w: 0)
+            matrix.biasVector = CIVector(x: 0.016, y: 0.006, z: -0.022, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
-        case .ilfordHP5:
-            colorControls.inputImage = current
+        case .aerochrome:
+            matrix.rVector = CIVector(x: 0.45, y: 0.68, z: -0.10, w: 0)
+            matrix.gVector = CIVector(x: 0.22, y: 0.52, z: 0.20, w: 0)
+            matrix.bVector = CIVector(x: -0.05, y: 0.08, z: 0.95, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
+            
+        case .bleachBypass, .ilfordHP5, .triX400:
+            break
+        }
+        
+        // 5. AJUSTE FINO DE CANALES R-G-B Y CREAM HIGHLIGHTS (Personalizable por el usuario y por cada cámara)
+        if abs(redTrim) > 0.01 || abs(greenTrim) > 0.01 || abs(blueTrim) > 0.01 || creamHighlights > 0.02 {
+            let rgbTuner = CIFilter.colorMatrix()
+            rgbTuner.inputImage = current
+            let rGain = CGFloat(1.0 + redTrim * 0.28 + creamHighlights * 0.06)
+            let gGain = CGFloat(1.0 + greenTrim * 0.28 + creamHighlights * 0.02)
+            let bGain = CGFloat(1.0 + blueTrim * 0.32 - creamHighlights * 0.14)
+            // Cuando greenTrim es negativo, oscurece selectivamente las hojas verdes restando verde en el canal rojo/azul
+            let foliagePull = CGFloat(min(0.0, greenTrim) * 0.18)
+            
+            rgbTuner.rVector = CIVector(x: rGain, y: foliagePull, z: 0, w: 0)
+            rgbTuner.gVector = CIVector(x: 0, y: gGain, z: 0, w: 0)
+            rgbTuner.bVector = CIVector(x: 0, y: foliagePull * 0.5, z: bGain, w: 0)
+            rgbTuner.biasVector = CIVector(
+                x: CGFloat(creamHighlights * 0.012),
+                y: CGFloat(creamHighlights * 0.004),
+                z: CGFloat(-creamHighlights * 0.018),
+                w: 0
+            )
+            if let out = rgbTuner.outputImage?.cropped(to: extent) { current = out }
+        }
+        
+        // 6. Control de Saturación y Vibrance (Apaga el verde y azul fosforescente digital)
+        let vibrance = CIFilter.vibrance()
+        vibrance.inputImage = current
+        vibrance.amount = (profile == .cineChrome) ? -0.28 : (profile == .velvia50 ? 0.15 : -0.14)
+        if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
+        
+        let colorControls = CIFilter.colorControls()
+        colorControls.inputImage = current
+        if profile == .ilfordHP5 {
             colorControls.saturation = 0.0
             colorControls.contrast = 0.98
-            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
-            
-        case .triX400:
+        } else if profile == .triX400 {
             let noir = CIFilter.photoEffectNoir()
             noir.inputImage = current
             if let out = noir.outputImage?.cropped(to: extent) { current = out }
+            colorControls.inputImage = current
+            colorControls.saturation = 0.0
+            colorControls.contrast = 1.08
+        } else {
+            colorControls.saturation = max(0.0, 0.92 + saturationAdjust * 0.45)
+            colorControls.contrast = 1.04
         }
+        if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
         
+        // 7. CURVA S + SHADOW CRUSH + CREAM ROLL-OFF (Iguala la densidad oscura de las palmeras y el cielo sedoso)
         let sAmount = Double(contrastSCurve)
-        let matteLift = Double(fadeMatteAmount) * 0.085
+        let crush = Double(shadowCrush)
+        let matteLift = Double(fadeMatteAmount) * 0.075
+        let creamRoll = Double(creamHighlights) * 0.065
+        
         let curve = CIFilter.toneCurve()
         curve.inputImage = current
         
-        let blackPoint = min(0.12, 0.015 + matteLift)
-        let shadowDip = max(blackPoint + 0.06, 0.22 - (sAmount * 0.085) + (matteLift * 0.35))
-        let midTone = 0.49
-        let highShoulder = min(0.85, 0.75 + (sAmount * 0.06))
-        let whiteRollOff = 0.915
+        let blackPoint = min(0.11, 0.012 + matteLift)
+        // Shadow Crush hunde el punto 1 (sombras bajas) y baja ligeramente el punto medio (0.45) para dar el peso analógico de la foto de referencia
+        let shadowDip = max(0.08, 0.22 - (sAmount * 0.08) - (crush * 0.09) + (matteLift * 0.25))
+        let midTone = max(0.41, 0.49 - (crush * 0.09))
+        let highShoulder = min(0.84, 0.74 + (sAmount * 0.05) - (creamRoll * 0.30))
+        let whiteRollOff = max(0.86, 0.93 - creamRoll) // Comprime los blancos altos a papel crema
         
         curve.point0 = CGPoint(x: 0.00, y: blackPoint)
         curve.point1 = CGPoint(x: 0.25, y: shadowDip)
@@ -403,12 +511,14 @@ class CinematicPipeline {
         curve.point4 = CGPoint(x: 1.00, y: whiteRollOff)
         if let out = curve.outputImage?.cropped(to: extent) { current = out }
         
+        // 8. Micro-contraste Óptico en Hojas y Texturas
         let clarity = CIFilter.unsharpMask()
         clarity.inputImage = current
-        clarity.radius = Float(min(18.0, 10.0 * scaleMultiplier))
-        clarity.intensity = 0.22
+        clarity.radius = Float(min(18.0, 11.0 * scaleMultiplier))
+        clarity.intensity = 0.26
         if let out = clarity.outputImage?.cropped(to: extent) { current = out }
         
+        // 9. Modo Retrato Óptico
         if portraitDepthBlur > 0.05 {
             let blur = CIFilter.gaussianBlur()
             blur.inputImage = current.clampedToExtent()
@@ -430,14 +540,16 @@ class CinematicPipeline {
             }
         }
         
+        // 10. Halation / Difusión Cálida Analógica (En Palms 70s suaviza el contraluz del cielo alrededor de las hojas)
         if bloomAmount > 0.04 {
             let bloom = CIFilter.bloom()
             bloom.inputImage = current.clampedToExtent()
-            bloom.radius = Float(min(20.0, 13.0 * scaleMultiplier))
-            bloom.intensity = bloomAmount * (profile == .nocturnaClub ? 0.62 : 0.46)
+            bloom.radius = Float(min(22.0, 15.0 * scaleMultiplier))
+            bloom.intensity = bloomAmount * (profile == .nocturnaClub ? 0.65 : 0.48)
             if let out = bloom.outputImage?.cropped(to: extent) { current = out }
         }
         
+        // 11. Viñeteado Óptico (0.0 por defecto en Palms 70s)
         if vignetteAmount > 0.02 {
             let vignette = CIFilter.vignette()
             vignette.inputImage = current
@@ -446,6 +558,7 @@ class CinematicPipeline {
             if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         }
         
+        // 12. Fuga de Luz Analógica Opcional
         if lightLeakEnabled {
             let grad = CIFilter.linearGradient()
             grad.point0 = CGPoint(x: 0, y: extent.height * 0.85)
@@ -460,6 +573,7 @@ class CinematicPipeline {
             }
         }
         
+        // 13. Lente Anamórfico Opcional
         if anamorphicMode {
             let flare = CIFilter.linearGradient()
             flare.point0 = CGPoint(x: extent.width * 0.1, y: extent.height * 0.5)
@@ -474,6 +588,7 @@ class CinematicPipeline {
             }
         }
         
+        // 14. Grano 35mm Real Escalado a los Megapíxeles
         if grainAmount > 0.02, let rawNoise = CIFilter.randomGenerator().outputImage {
             let grainScale = max(1.8, min(extent.width, extent.height) / 920.0)
             let scaledNoise = rawNoise.transformed(by: CGAffineTransform(scaleX: grainScale, y: grainScale))
@@ -645,6 +760,11 @@ class CinematicPipeline {
         from ciInput: CIImage,
         profile: FilmProfile,
         contrastSCurve: Float,
+        shadowCrush: Float,
+        creamHighlights: Float,
+        redTrim: Float,
+        greenTrim: Float,
+        blueTrim: Float,
         bloomAmount: Float,
         grainAmount: Float,
         vignetteAmount: Float,
@@ -662,6 +782,11 @@ class CinematicPipeline {
             to: ciInput,
             profile: profile,
             contrastSCurve: contrastSCurve,
+            shadowCrush: shadowCrush,
+            creamHighlights: creamHighlights,
+            redTrim: redTrim,
+            greenTrim: greenTrim,
+            blueTrim: blueTrim,
             bloomAmount: bloomAmount,
             grainAmount: grainAmount,
             vignetteAmount: vignetteAmount,
@@ -690,6 +815,11 @@ class CinematicPipeline {
         wbTint: Float = 0.0,
         profile: FilmProfile,
         contrastSCurve: Float,
+        shadowCrush: Float = 0.35,
+        creamHighlights: Float = 0.45,
+        redTrim: Float = 0.0,
+        greenTrim: Float = 0.0,
+        blueTrim: Float = 0.0,
         bloomAmount: Float,
         grainAmount: Float,
         vignetteAmount: Float,
@@ -726,7 +856,6 @@ class CinematicPipeline {
         default: targetExifOrientation = .right
         }
         
-        // Propiedades 100% verificadas en CIRAWFilter para el SDK de iOS 18.5
         if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
             rawFilter.luminanceNoiseReductionAmount = 0.94
             rawFilter.colorNoiseReductionAmount = 1.00
@@ -779,6 +908,11 @@ class CinematicPipeline {
             to: normalizedInput,
             profile: profile,
             contrastSCurve: contrastSCurve,
+            shadowCrush: shadowCrush,
+            creamHighlights: creamHighlights,
+            redTrim: redTrim,
+            greenTrim: greenTrim,
+            blueTrim: blueTrim,
             bloomAmount: bloomAmount,
             grainAmount: grainAmount,
             vignetteAmount: vignetteAmount,
@@ -848,16 +982,22 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var statusMessage = "48MP PRO"
     var lastExifSummary = "1/125s | f/1.6 | ISO 64"
     var currentZoom: CGFloat = 1.0
-    var selectedProfile: FilmProfile = .cineChrome
+    var selectedProfile: FilmProfile = .cineChrome // Arranca en Palms 70s por defecto
     
-    var exposureEV: Float = -0.40
-    var contrastSCurve: Float = 0.74
-    var warmth: Float = 0.06
+    // Parámetros inicializados con la receta exacta de las Palmeras 70s
+    var exposureEV: Float = -0.45
+    var contrastSCurve: Float = 0.82
+    var shadowCrush: Float = 0.48
+    var creamHighlights: Float = 0.68
+    var redTrim: Float = 0.18
+    var greenTrim: Float = -0.22
+    var blueTrim: Float = -0.42
+    var warmth: Float = 0.14
     var bloomIntensity: Float = 1.00
-    var grainIntensity: Float = 0.30
+    var grainIntensity: Float = 0.32
     var vignetteIntensity: Float = 0.00
-    var fadeMatteAmount: Float = 0.22
-    var saturationAdjust: Float = -0.16
+    var fadeMatteAmount: Float = 0.18
+    var saturationAdjust: Float = -0.24
     var portraitDepthBlur: Float = 0.0
     var nightModeEnabled = false
     var shutterSpeed: ShutterSpeedOption = .auto
@@ -901,6 +1041,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let rec = selectedProfile.recommended
         exposureEV = rec.ev
         contrastSCurve = rec.contrastSCurve
+        shadowCrush = rec.shadowCrush
+        creamHighlights = rec.creamHighlights
+        redTrim = rec.redTrim
+        greenTrim = rec.greenTrim
+        blueTrim = rec.blueTrim
         warmth = rec.warmth
         bloomIntensity = rec.bloom
         grainIntensity = rec.grain
@@ -915,6 +1060,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     func resetToNeutral() {
         exposureEV = 0.0
         contrastSCurve = 0.35
+        shadowCrush = 0.0
+        creamHighlights = 0.0
+        redTrim = 0.0
+        greenTrim = 0.0
+        blueTrim = 0.0
         warmth = 0.0
         bloomIntensity = 0.0
         grainIntensity = 0.0
@@ -1310,6 +1460,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let photoMeta = photo.metadata
         let profile = self.selectedProfile
         let sCurve = self.contrastSCurve
+        let crush = self.shadowCrush
+        let cream = self.creamHighlights
+        let rTrim = self.redTrim
+        let gTrim = self.greenTrim
+        let bTrim = self.blueTrim
         let bloom = self.bloomIntensity
         let grain = self.grainIntensity
         let vignette = self.vignetteIntensity
@@ -1336,6 +1491,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 wbTint: measuredTint,
                 profile: profile,
                 contrastSCurve: sCurve,
+                shadowCrush: crush,
+                creamHighlights: cream,
+                redTrim: rTrim,
+                greenTrim: gTrim,
+                blueTrim: bTrim,
                 bloomAmount: bloom,
                 grainAmount: grain,
                 vignetteAmount: vignette,
@@ -1442,10 +1602,15 @@ struct NativeCameraPreview: UIViewRepresentable {
     }
 }
 
-// MARK: - 5. Capa de Previsualización Fiel en Vivo
+// MARK: - 5. Capa de Previsualización Fiel en Vivo (Con soporte para Canales RGB y Cream Highlights)
 struct LiveOpticalEffectsView: View {
     let profile: FilmProfile
     let contrastSCurve: Float
+    let shadowCrush: Float
+    let creamHighlights: Float
+    let redTrim: Float
+    let greenTrim: Float
+    let blueTrim: Float
     let fadeMatteAmount: Float
     let vignetteIntensity: Float
     let grainIntensity: Float
@@ -1469,6 +1634,17 @@ struct LiveOpticalEffectsView: View {
             ZStack {
                 filmLiveOverlay(for: profile)
                 
+                // Previsualización en vivo de Cream Highlights y balance R-G-B
+                if creamHighlights > 0.02 || abs(redTrim) > 0.02 || abs(blueTrim) > 0.02 {
+                    Color(
+                        red: min(1.0, max(0.0, 0.90 + Double(redTrim) * 0.25 + Double(creamHighlights) * 0.12)),
+                        green: min(1.0, max(0.0, 0.84 + Double(greenTrim) * 0.20 + Double(creamHighlights) * 0.06)),
+                        blue: min(1.0, max(0.0, 0.72 + Double(blueTrim) * 0.30 - Double(creamHighlights) * 0.22))
+                    )
+                    .opacity(0.18)
+                    .blendMode(.softLight)
+                }
+                
                 if fadeMatteAmount > 0.02 {
                     Color(white: 0.14)
                         .opacity(Double(fadeMatteAmount) * 0.22)
@@ -1489,7 +1665,7 @@ struct LiveOpticalEffectsView: View {
                     (warmth > 0
                         ? Color(red: 1.0, green: 0.76, blue: 0.40)
                         : Color(red: 0.35, green: 0.75, blue: 1.0))
-                        .opacity(Double(abs(warmth)) * 0.14)
+                        .opacity(Double(abs(warmth)) * 0.16)
                         .blendMode(.softLight)
                 }
                 
@@ -1510,7 +1686,7 @@ struct LiveOpticalEffectsView: View {
                 if bloomIntensity > 0.04 {
                     RadialGradient(
                         colors: [
-                            Color.white.opacity(Double(bloomIntensity) * 0.16),
+                            Color(red: 1.0, green: 0.94, blue: 0.82).opacity(Double(bloomIntensity) * 0.16),
                             profile.badgeColor.opacity(Double(bloomIntensity) * 0.09),
                             .clear
                         ],
@@ -1612,21 +1788,32 @@ struct LiveOpticalEffectsView: View {
     @ViewBuilder
     private func filmLiveOverlay(for profile: FilmProfile) -> some View {
         switch profile {
-        case .ocamMaster, .cineChrome, .kodak2383:
+        case .cineChrome:
             LinearGradient(
                 colors: [
-                    Color(white: 0.95).opacity(0.06),
-                    Color.clear,
-                    Color.black.opacity(0.10)
+                    Color(red: 0.98, green: 0.90, blue: 0.72).opacity(0.18),
+                    Color(red: 0.12, green: 0.28, blue: 0.22).opacity(0.16)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .blendMode(.softLight)
+        case .ocamMaster, .kodak2383:
+            LinearGradient(
+                colors: [
+                    Color(red: 0.96, green: 0.90, blue: 0.78).opacity(0.10),
+                    Color(red: 0.08, green: 0.20, blue: 0.24).opacity(0.12)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .blendMode(.softLight)
+        case .portra400, .gold200, .polaroid600:
+            Color(red: 1.0, green: 0.82, blue: 0.55).opacity(0.14).blendMode(.softLight)
         case .aerochrome:
-            Color(red: 0.95, green: 0.20, blue: 0.45).opacity(0.14).blendMode(.softLight)
+            Color(red: 0.95, green: 0.20, blue: 0.45).opacity(0.16).blendMode(.softLight)
         case .cinestill800T:
-            Color(red: 0.20, green: 0.65, blue: 0.95).opacity(0.08).blendMode(.softLight)
+            Color(red: 0.20, green: 0.65, blue: 0.95).opacity(0.12).blendMode(.softLight)
         default:
             Color.clear
         }
@@ -1645,7 +1832,7 @@ struct SeededRandomGenerator: RandomNumberGenerator {
     }
 }
 
-// MARK: - 6. Laboratorio oCam Studio de Alta Precisión
+// MARK: - 6. Laboratorio oCam Studio con Mixer R-G-B, Cream Sky y Shadow Crush
 struct GalleryDarkroomView: View {
     let originalData: Data
     var onSaveSuccess: (UIImage, String) -> Void
@@ -1653,15 +1840,20 @@ struct GalleryDarkroomView: View {
     
     @State private var selectedProfile: FilmProfile = .cineChrome
     @State private var activeTab: Int = 0
-    @State private var exposureAdjust: Float = 0.0
-    @State private var contrastSCurve: Float = 0.74
+    @State private var exposureAdjust: Float = -0.10
+    @State private var contrastSCurve: Float = 0.82
+    @State private var shadowCrush: Float = 0.48
+    @State private var creamHighlights: Float = 0.68
+    @State private var redTrim: Float = 0.18
+    @State private var greenTrim: Float = -0.22
+    @State private var blueTrim: Float = -0.42
     @State private var shadowsAdjust: Float = 0.0
     @State private var highlightsAdjust: Float = 0.25
-    @State private var fadeMatteAmount: Float = 0.22
-    @State private var saturationAdjust: Float = -0.16
-    @State private var warmthAdjust: Float = 0.06
+    @State private var fadeMatteAmount: Float = 0.18
+    @State private var saturationAdjust: Float = -0.24
+    @State private var warmthAdjust: Float = 0.14
     @State private var bloomAmount: Float = 1.00
-    @State private var grainAmount: Float = 0.30
+    @State private var grainAmount: Float = 0.32
     @State private var vignetteAmount: Float = 0.00
     @State private var portraitDepthBlur: Float = 0.0
     @State private var lightLeakEnabled = false
@@ -1715,8 +1907,13 @@ struct GalleryDarkroomView: View {
                     Menu {
                         Button("Recomendado (\(selectedProfile.rawValue))", systemImage: "sparkles") {
                             let rec = selectedProfile.recommended
-                            exposureAdjust = 0.0
+                            exposureAdjust = -0.10
                             contrastSCurve = rec.contrastSCurve
+                            shadowCrush = rec.shadowCrush
+                            creamHighlights = rec.creamHighlights
+                            redTrim = rec.redTrim
+                            greenTrim = rec.greenTrim
+                            blueTrim = rec.blueTrim
                             shadowsAdjust = 0.0
                             highlightsAdjust = 0.20
                             fadeMatteAmount = rec.fadeMatte
@@ -1730,6 +1927,11 @@ struct GalleryDarkroomView: View {
                         Button("Restablecer a Cero", systemImage: "arrow.counterclockwise") {
                             exposureAdjust = 0.0
                             contrastSCurve = 0.35
+                            shadowCrush = 0.0
+                            creamHighlights = 0.0
+                            redTrim = 0.0
+                            greenTrim = 0.0
+                            blueTrim = 0.0
                             shadowsAdjust = 0.0
                             highlightsAdjust = 0.0
                             fadeMatteAmount = 0.0
@@ -1792,7 +1994,7 @@ struct GalleryDarkroomView: View {
                         Text(isShowingOriginal ? "ORIGINAL SIN FILTRO" : "oCam Studio • \(selectedProfile.rawValue)")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.95))
-                        Text("S-Curve \(String(format: "%.2f", contrastSCurve * 4.0)) | Halation \(Int(bloomAmount * 100))%")
+                        Text("R:\(String(format: "%+.1f", redTrim)) G:\(String(format: "%+.1f", greenTrim)) B:\(String(format: "%+.1f", blueTrim)) | Cream \(Int(creamHighlights * 100))%")
                             .font(.system(size: 9.5, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.70))
                     }
@@ -1805,16 +2007,18 @@ struct GalleryDarkroomView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 14)
                 
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     if activeTab == 0 {
                         darkroomSlider(title: "S-Curve Contrast", value: $contrastSCurve, range: 0.0...1.0, format: "%.2f", multiplier: 4.0)
-                        darkroomSlider(title: "Matte Fade (Roll-Off)", value: $fadeMatteAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                        darkroomSlider(title: "Highlights Protect", value: $highlightsAdjust, range: -0.5...1.0, format: "%+.2f")
-                        darkroomSlider(title: "Shadows Lift / Deep", value: $shadowsAdjust, range: -0.6...0.8, format: "%+.2f")
-                    } else if activeTab == 1 {
+                        darkroomSlider(title: "Shadow Crush (Deep)", value: $shadowCrush, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        darkroomSlider(title: "Cream Sky Roll-Off", value: $creamHighlights, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        darkroomSlider(title: "Matte Fade", value: $fadeMatteAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                         darkroomSlider(title: "Exposure (EV)", value: $exposureAdjust, range: -1.5...1.5, format: "%+.2f")
+                    } else if activeTab == 1 {
+                        darkroomSlider(title: "Red Channel (Warm)", value: $redTrim, range: -0.6...0.6, format: "%+.2f")
+                        darkroomSlider(title: "Green (Pine Foliage)", value: $greenTrim, range: -0.6...0.6, format: "%+.2f")
+                        darkroomSlider(title: "Blue (Cream / Teal Sky)", value: $blueTrim, range: -0.6...0.6, format: "%+.2f")
                         darkroomSlider(title: "Saturation (Organic)", value: $saturationAdjust, range: -0.6...0.5, format: "%+.2f")
-                        darkroomSlider(title: "White Balance (WB)", value: $warmthAdjust, range: -1.0...1.0, format: "%+.2f")
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -1824,6 +2028,11 @@ struct GalleryDarkroomView: View {
                                         selectedProfile = profile
                                         let rec = profile.recommended
                                         contrastSCurve = rec.contrastSCurve
+                                        shadowCrush = rec.shadowCrush
+                                        creamHighlights = rec.creamHighlights
+                                        redTrim = rec.redTrim
+                                        greenTrim = rec.greenTrim
+                                        blueTrim = rec.blueTrim
                                         fadeMatteAmount = rec.fadeMatte
                                         saturationAdjust = rec.saturationAdjust
                                         warmthAdjust = rec.warmth
@@ -1854,7 +2063,7 @@ struct GalleryDarkroomView: View {
                         darkroomSlider(title: "Halation Glow", value: $bloomAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                         darkroomSlider(title: "35mm Film Grain", value: $grainAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                         darkroomSlider(title: "Optical Vignette", value: $vignetteAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                        darkroomSlider(title: "Portrait Bokeh", value: $portraitDepthBlur, range: 0.0...1.0, format: "f/%.1f", multiplier: 1.4)
+                        darkroomSlider(title: "White Balance (WB)", value: $warmthAdjust, range: -1.0...1.0, format: "%+.2f")
                     } else {
                         HStack(spacing: 8) {
                             ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
@@ -1924,7 +2133,7 @@ struct GalleryDarkroomView: View {
                 
                 HStack(spacing: 16) {
                     studioTabButton(index: 0, icon: "chart.xyaxis.line", title: "Tone")
-                    studioTabButton(index: 1, icon: "paintpalette", title: "Color")
+                    studioTabButton(index: 1, icon: "slider.horizontal.below.square.and.square.filled", title: "RGB")
                     studioTabButton(index: 2, icon: "sparkles", title: "Texture")
                     studioTabButton(index: 3, icon: "crop", title: "Crop")
                 }
@@ -1966,11 +2175,11 @@ struct GalleryDarkroomView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
                 Spacer()
                 Text(String(format: format, value.wrappedValue * multiplier))
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
                     .foregroundStyle(selectedProfile.badgeColor)
             }
             Slider(value: Binding(
@@ -2012,6 +2221,11 @@ struct GalleryDarkroomView: View {
         guard let baseCI = scaledCIImage else { return }
         let prof = selectedProfile
         let sCurve = contrastSCurve
+        let crush = shadowCrush
+        let cream = creamHighlights
+        let rTrim = redTrim
+        let gTrim = greenTrim
+        let bTrim = blueTrim
         let bloom = bloomAmount
         let grain = grainAmount
         let vig = vignetteAmount
@@ -2032,6 +2246,11 @@ struct GalleryDarkroomView: View {
                 from: baseCI,
                 profile: prof,
                 contrastSCurve: sCurve,
+                shadowCrush: crush,
+                creamHighlights: cream,
+                redTrim: rTrim,
+                greenTrim: gTrim,
+                blueTrim: bTrim,
                 bloomAmount: bloom,
                 grainAmount: grain,
                 vignetteAmount: vig,
@@ -2065,6 +2284,11 @@ struct GalleryDarkroomView: View {
         isSaving = true
         let prof = selectedProfile
         let sCurve = contrastSCurve
+        let crush = shadowCrush
+        let cream = creamHighlights
+        let rTrim = redTrim
+        let gTrim = greenTrim
+        let bTrim = blueTrim
         let bloom = bloomAmount
         let grain = grainAmount
         let vig = vignetteAmount
@@ -2088,6 +2312,11 @@ struct GalleryDarkroomView: View {
                 wasCapturedAsRAW: false,
                 profile: prof,
                 contrastSCurve: sCurve,
+                shadowCrush: crush,
+                creamHighlights: cream,
+                redTrim: rTrim,
+                greenTrim: gTrim,
+                blueTrim: bTrim,
                 bloomAmount: bloom,
                 grainAmount: grain,
                 vignetteAmount: vig,
@@ -2127,7 +2356,7 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 7. Interfaz Principal oCam Modular
+// MARK: - 7. Interfaz Principal oCam Modular con Pestaña RGB Directa
 struct GridOverlayView: View {
     let showHorizon: Bool
     let horizonDegrees: Double
@@ -2173,7 +2402,7 @@ struct ContentView: View {
     @State private var camera = CameraManager()
     @State private var showTray = false
     @State private var showExposureBar = false
-    @State private var activeDrawerTab: Int = 0
+    @State private var activeDrawerTab: Int = 0 // 0: Tone, 1: RGB, 2: Grain, 3: Format
     @State private var showFullPreview = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var importedPhotoData: Data?
@@ -2389,12 +2618,17 @@ struct ContentView: View {
                     NativeCameraPreview(session: camera.session) { devicePt, viewPt in
                         camera.focusAt(normalizedPoint: devicePt, viewPoint: viewPt)
                     }
-                    .contrast(liveContrast(for: camera.selectedProfile) + Double(camera.contrastSCurve) * 0.12)
+                    .contrast(liveContrast(for: camera.selectedProfile) + Double(camera.contrastSCurve) * 0.14)
                     .saturation(max(0.0, liveSaturation(for: camera.selectedProfile) + Double(camera.saturationAdjust) * 0.35))
                     
                     LiveOpticalEffectsView(
                         profile: camera.selectedProfile,
                         contrastSCurve: camera.contrastSCurve,
+                        shadowCrush: camera.shadowCrush,
+                        creamHighlights: camera.creamHighlights,
+                        redTrim: camera.redTrim,
+                        greenTrim: camera.greenTrim,
+                        blueTrim: camera.blueTrim,
                         fadeMatteAmount: camera.fadeMatteAmount,
                         vignetteIntensity: camera.vignetteIntensity,
                         grainIntensity: camera.grainIntensity,
@@ -2519,13 +2753,14 @@ struct ContentView: View {
     }
     
     private var controlsDrawerView: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 6) {
+        VStack(spacing: 8) {
+            HStack(spacing: 5) {
                 trayTabPill(index: 0, title: "Tone")
-                trayTabPill(index: 1, title: "Grain")
-                trayTabPill(index: 2, title: "Format")
+                trayTabPill(index: 1, title: "RGB")
+                trayTabPill(index: 2, title: "Grain")
+                trayTabPill(index: 3, title: "Format")
                 
-                Spacer(minLength: 4)
+                Spacer(minLength: 2)
                 
                 Menu {
                     Button("Recomendado para \(camera.selectedProfile.rawValue)", systemImage: "sparkles") {
@@ -2545,7 +2780,7 @@ struct ContentView: View {
                     }
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.black)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 6)
                     .background(camera.selectedProfile.badgeColor)
                     .clipShape(Capsule())
@@ -2560,15 +2795,25 @@ struct ContentView: View {
                 
                 glassSliderRow(title: "S-CURVE", value: $camera.contrastSCurve, range: 0.0...1.0, text: String(format: "%.2f", camera.contrastSCurve * 4.0))
                 
-                glassSliderRow(title: "MATTE FADE", value: $camera.fadeMatteAmount, range: 0.0...1.0, text: "\(Int(camera.fadeMatteAmount * 100))%")
+                glassSliderRow(title: "DARK CRUSH", value: $camera.shadowCrush, range: 0.0...1.0, text: "\(Int(camera.shadowCrush * 100))%")
                 
-                glassSliderRow(title: "TEMP (WB)", value: $camera.warmth, range: -1.0...1.0, text: String(format: "%+.1f", camera.warmth))
+                glassSliderRow(title: "CREAM SKY", value: $camera.creamHighlights, range: 0.0...1.0, text: "\(Int(camera.creamHighlights * 100))%")
             } else if activeDrawerTab == 1 {
+                glassSliderRow(title: "RED GAIN", value: $camera.redTrim, range: -0.6...0.6, text: String(format: "%+.2f", camera.redTrim))
+                
+                glassSliderRow(title: "GREEN PINE", value: $camera.greenTrim, range: -0.6...0.6, text: String(format: "%+.2f", camera.greenTrim))
+                
+                glassSliderRow(title: "BLUE SKY", value: $camera.blueTrim, range: -0.6...0.6, text: String(format: "%+.2f", camera.blueTrim))
+                
+                glassSliderRow(title: "SATURACIÓN", value: $camera.saturationAdjust, range: -0.6...0.5, text: String(format: "%+.2f", camera.saturationAdjust))
+            } else if activeDrawerTab == 2 {
                 glassSliderRow(title: "HALATION", value: $camera.bloomIntensity, range: 0.0...1.0, text: "\(Int(camera.bloomIntensity * 100))%")
                 
                 glassSliderRow(title: "GRANO 35MM", value: $camera.grainIntensity, range: 0.0...1.0, text: "\(Int(camera.grainIntensity * 100))%")
                 
                 glassSliderRow(title: "VIÑETEADO", value: $camera.vignetteIntensity, range: 0.0...1.0, text: "\(Int(camera.vignetteIntensity * 100))%")
+                
+                glassSliderRow(title: "MATTE FADE", value: $camera.fadeMatteAmount, range: 0.0...1.0, text: "\(Int(camera.fadeMatteAmount * 100))%")
             } else {
                 HStack(spacing: 6) {
                     ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
@@ -2614,7 +2859,7 @@ struct ContentView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.18), lineWidth: 0.7))
-        .padding(.horizontal, 26)
+        .padding(.horizontal, 24)
     }
     
     private var filmCarouselView: some View {
@@ -2775,11 +3020,11 @@ struct ContentView: View {
             }
         } label: {
             Text(title)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(activeDrawerTab == index ? .black : .white.opacity(0.85))
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(activeDrawerTab == index ? Color.white : Color.white.opacity(0.12))
                 .clipShape(Capsule())
@@ -2790,15 +3035,15 @@ struct ContentView: View {
     private func glassSliderRow(title: String, value: Binding<Float>, range: ClosedRange<Float>, text: String) -> some View {
         HStack(spacing: 10) {
             Text(title)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 72, alignment: .leading)
+                .frame(width: 74, alignment: .leading)
             Slider(value: value, in: range)
                 .tint(camera.selectedProfile.badgeColor)
             Text(text)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(camera.selectedProfile.badgeColor)
@@ -2808,10 +3053,11 @@ struct ContentView: View {
     
     private func liveContrast(for profile: FilmProfile) -> Double {
         switch profile {
-        case .triX400, .bleachBypass: return 1.20
-        case .ocamMaster, .cineChrome, .kodak2383, .nocturnaClub: return 1.08
+        case .triX400, .bleachBypass: return 1.22
+        case .cineChrome, .kodak2383: return 1.14
+        case .ocamMaster, .nocturnaClub: return 1.10
         case .polaroid600, .ilfordHP5: return 0.96
-        default: return 1.06
+        default: return 1.08
         }
     }
     
@@ -2819,10 +3065,10 @@ struct ContentView: View {
         switch profile {
         case .triX400, .ilfordHP5: return 0.0
         case .bleachBypass: return 0.45
-        case .velvia50: return 1.12
-        case .cineChrome: return 0.83
-        case .ocamMaster, .polaroid600: return 0.88
-        default: return 0.94
+        case .velvia50: return 1.16
+        case .cineChrome: return 0.78
+        case .ocamMaster, .polaroid600: return 0.86
+        default: return 0.92
         }
     }
 }
