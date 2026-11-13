@@ -1,6 +1,5 @@
 import SwiftUI
 import AVFoundation
-import AVKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import CoreMotion
@@ -811,9 +810,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 try device.lockForConfiguration()
                 device.activeFormat = format48
                 device.automaticallyAdjustsVideoHDREnabled = false
-                if device.isGlobalToneMappingSupported {
-                    device.isGlobalToneMappingEnabled = true
-                }
                 device.unlockForConfiguration()
                 self.photoOutput.maxPhotoDimensions = d48
                 self.photoOutput.maxPhotoQualityPrioritization = .quality
@@ -1226,11 +1222,10 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     }
 }
 
-// MARK: - 4. Visor Óptico + Botón Físico Camera Control (AVCaptureEventInteraction)
+// MARK: - 4. Visor Óptico de Alta Precisión
 struct NativeCameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     var onTapFocus: (CGPoint, CGPoint) -> Void
-    var onHardwareShutter: () -> Void
     
     func makeUIView(context: Context) -> UIView {
         let view = PreviewView()
@@ -1239,18 +1234,6 @@ struct NativeCameraPreview: UIViewRepresentable {
         
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         view.addGestureRecognizer(tap)
-        
-        if #available(iOS 17.2, *) {
-            let eventInteraction = AVCaptureEventInteraction { event in
-                if event.phase == .ended {
-                    DispatchQueue.main.async {
-                        onHardwareShutter()
-                    }
-                }
-            }
-            view.addInteraction(eventInteraction)
-        }
-        
         return view
     }
     
@@ -1517,7 +1500,8 @@ struct GalleryDarkroomView: View {
                             .foregroundStyle(.black)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(selectedProfile.badgeColor, in: Capsule())
+                            .background(selectedProfile.badgeColor)
+                            .clipShape(Capsule())
                     }
                     
                     Spacer()
@@ -1548,7 +1532,8 @@ struct GalleryDarkroomView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial, in: Circle())
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
                     }
                     
                     Button {
@@ -1564,7 +1549,8 @@ struct GalleryDarkroomView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
                         .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.8))
                     }
                     .disabled(isSaving)
@@ -1596,7 +1582,8 @@ struct GalleryDarkroomView: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                     .padding(16)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1628,7 +1615,8 @@ struct GalleryDarkroomView: View {
                                             .foregroundStyle(selectedProfile == profile ? .black : .white)
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
-                                            .background(selectedProfile == profile ? profile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                            .background(selectedProfile == profile ? profile.badgeColor : Color.white.opacity(0.12))
+                                            .clipShape(Capsule())
                                     }
                                 }
                             }
@@ -1649,7 +1637,8 @@ struct GalleryDarkroomView: View {
                                         .foregroundStyle(aspectRatio == ratio ? .black : .white)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 7)
-                                        .background(aspectRatio == ratio ? selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                        .background(aspectRatio == ratio ? selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                        .clipShape(Capsule())
                                 }
                             }
                         }
@@ -1663,7 +1652,8 @@ struct GalleryDarkroomView: View {
                                     .foregroundStyle(dateStampEnabled ? .black : .white)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
-                                    .background(dateStampEnabled ? selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                    .background(dateStampEnabled ? selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                    .clipShape(Capsule())
                             }
                             Button {
                                 lightLeakEnabled.toggle()
@@ -1674,7 +1664,8 @@ struct GalleryDarkroomView: View {
                                     .foregroundStyle(lightLeakEnabled ? .black : .white)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
-                                    .background(lightLeakEnabled ? selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                    .background(lightLeakEnabled ? selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                    .clipShape(Capsule())
                             }
                             Button {
                                 let all = FrameStyleOption.allCases
@@ -1688,14 +1679,16 @@ struct GalleryDarkroomView: View {
                                     .foregroundStyle(frameStyle != .none ? .black : .white)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
-                                    .background(frameStyle != .none ? selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                    .background(frameStyle != .none ? selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                    .clipShape(Capsule())
                             }
                         }
                     }
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.15), lineWidth: 0.7))
                 .padding(.horizontal, 14)
                 
@@ -1731,7 +1724,8 @@ struct GalleryDarkroomView: View {
             .foregroundStyle(activeTab == index ? selectedProfile.badgeColor : .white.opacity(0.6))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(activeTab == index ? Color.white.opacity(0.12) : Color.clear, in: Capsule())
+            .background(activeTab == index ? Color.white.opacity(0.12) : Color.clear)
+            .clipShape(Capsule())
         }
     }
     
@@ -1933,8 +1927,9 @@ struct ContentView: View {
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .padding(.horizontal, 11)
                             .padding(.vertical, 6)
-                            .background(camera.useRAWCapture || camera.use48MPMode ? camera.selectedProfile.badgeColor : Color.white.opacity(0.15), in: Capsule())
+                            .background(camera.useRAWCapture || camera.use48MPMode ? camera.selectedProfile.badgeColor : Color.white.opacity(0.15))
                             .foregroundStyle(camera.useRAWCapture || camera.use48MPMode ? .black : .white)
+                            .clipShape(Capsule())
                     }
                     
                     Button {
@@ -1946,7 +1941,8 @@ struct ContentView: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(camera.nightModeEnabled ? .black : .white.opacity(0.85))
                             .frame(width: 32, height: 32)
-                            .background(camera.nightModeEnabled ? Color.yellow : Color.white.opacity(0.12), in: Circle())
+                            .background(camera.nightModeEnabled ? Color.yellow : Color.white.opacity(0.12))
+                            .clipShape(Circle())
                     }
                     
                     Button {
@@ -1960,7 +1956,8 @@ struct ContentView: View {
                             .italic()
                             .foregroundStyle(camera.portraitDepthBlur > 0.05 ? .black : .white.opacity(0.85))
                             .frame(width: 32, height: 32)
-                            .background(camera.portraitDepthBlur > 0.05 ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12), in: Circle())
+                            .background(camera.portraitDepthBlur > 0.05 ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                            .clipShape(Circle())
                     }
                     
                     Spacer()
@@ -1982,7 +1979,8 @@ struct ContentView: View {
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(showExposureBar || abs(camera.exposureEV + 0.45) > 0.05 ? camera.selectedProfile.badgeColor : .white.opacity(0.85))
                             .frame(width: 32, height: 32)
-                            .background(Color.white.opacity(0.12), in: Circle())
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(Circle())
                     }
                     
                     Button {
@@ -1993,7 +1991,8 @@ struct ContentView: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(camera.flashEnabled ? .yellow : .white.opacity(0.8))
                             .frame(width: 32, height: 32)
-                            .background(Color.white.opacity(0.12), in: Circle())
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(Circle())
                     }
                     
                     Button {
@@ -2007,12 +2006,14 @@ struct ContentView: View {
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(showTray ? .black : .white)
                             .frame(width: 32, height: 32)
-                            .background(showTray ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12), in: Circle())
+                            .background(showTray ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                            .clipShape(Circle())
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
                 .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.6))
                 .padding(.horizontal, 14)
                 
@@ -2026,15 +2027,9 @@ struct ContentView: View {
                     
                     ZStack {
                         ZStack {
-                            NativeCameraPreview(
-                                session: camera.session,
-                                onTapFocus: { devicePt, viewPt in
-                                    camera.focusAt(normalizedPoint: devicePt, viewPoint: viewPt)
-                                },
-                                onHardwareShutter: {
-                                    camera.triggerShutter()
-                                }
-                            )
+                            NativeCameraPreview(session: camera.session) { devicePt, viewPt in
+                                camera.focusAt(normalizedPoint: devicePt, viewPoint: viewPt)
+                            }
                             .contrast(liveContrast(for: camera.selectedProfile) + Double(camera.contrastSCurve) * 0.14)
                             .saturation(liveSaturation(for: camera.selectedProfile))
                             
@@ -2085,7 +2080,8 @@ struct ContentView: View {
                                     .foregroundStyle(.white.opacity(0.9))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 4)
-                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(Capsule())
                             }
                             .padding(.top, 10)
                             
@@ -2108,7 +2104,8 @@ struct ContentView: View {
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
-                                .background(.ultraThinMaterial, in: Capsule())
+                                .background(.ultraThinMaterial)
+                                .clipShape(Capsule())
                                 .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 0.6))
                                 .padding(.horizontal, 24)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -2141,7 +2138,8 @@ struct ContentView: View {
                                             .foregroundStyle(.black)
                                             .padding(.horizontal, 9)
                                             .padding(.vertical, 5)
-                                            .background(camera.selectedProfile.badgeColor, in: Capsule())
+                                            .background(camera.selectedProfile.badgeColor)
+                                            .clipShape(Capsule())
                                         }
                                     }
                                     
@@ -2172,7 +2170,8 @@ struct ContentView: View {
                                                         .foregroundStyle(camera.aspectRatio == ratio ? .black : .white)
                                                         .frame(maxWidth: .infinity)
                                                         .padding(.vertical, 6)
-                                                        .background(camera.aspectRatio == ratio ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                                        .background(camera.aspectRatio == ratio ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                        .clipShape(Capsule())
                                                 }
                                             }
                                         }
@@ -2186,7 +2185,8 @@ struct ContentView: View {
                                                     .foregroundStyle(camera.dateStampEnabled ? .black : .white)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 6)
-                                                    .background(camera.dateStampEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                                    .background(camera.dateStampEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                    .clipShape(Capsule())
                                             }
                                             
                                             Button {
@@ -2197,7 +2197,8 @@ struct ContentView: View {
                                                     .foregroundStyle(camera.lightLeakEnabled ? .black : .white)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 6)
-                                                    .background(camera.lightLeakEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                                    .background(camera.lightLeakEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                    .clipShape(Capsule())
                                             }
                                             
                                             Button {
@@ -2211,7 +2212,8 @@ struct ContentView: View {
                                                     .foregroundStyle(camera.frameStyle != .none ? .black : .white)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 6)
-                                                    .background(camera.frameStyle != .none ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12), in: Capsule())
+                                                    .background(camera.frameStyle != .none ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                    .clipShape(Capsule())
                                             }
                                             
                                             Button {
@@ -2221,14 +2223,16 @@ struct ContentView: View {
                                                     .font(.system(size: 12))
                                                     .foregroundStyle(camera.showGrid ? .black : .white)
                                                     .padding(6)
-                                                    .background(camera.showGrid ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12), in: Circle())
+                                                    .background(camera.showGrid ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                    .clipShape(Circle())
                                             }
                                         }
                                     }
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                .background(.ultraThinMaterial)
+                                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.18), lineWidth: 0.7))
                                 .padding(.horizontal, 16)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -2243,12 +2247,14 @@ struct ContentView: View {
                                             .font(.system(size: 12, weight: .bold, design: .rounded))
                                             .foregroundStyle(camera.currentZoom == level ? camera.selectedProfile.badgeColor : .white)
                                             .frame(width: 34, height: 34)
-                                            .background(camera.currentZoom == level ? Color.black.opacity(0.65) : Color.clear, in: Circle())
+                                            .background(camera.currentZoom == level ? Color.black.opacity(0.65) : Color.clear)
+                                            .clipShape(Circle())
                                     }
                                 }
                             }
                             .padding(4)
-                            .background(.ultraThinMaterial, in: Capsule())
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
                             .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.5))
                             .padding(.bottom, 8)
                         }
@@ -2275,12 +2281,8 @@ struct ContentView: View {
                                 .foregroundStyle(camera.selectedProfile == profile ? .black : .white)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
-                                .background(
-                                    camera.selectedProfile == profile
-                                        ? profile.badgeColor
-                                        : Color.white.opacity(0.12),
-                                    in: Capsule()
-                                )
+                                .background(camera.selectedProfile == profile ? profile.badgeColor : Color.white.opacity(0.12))
+                                .clipShape(Capsule())
                                 .overlay(
                                     Capsule()
                                         .stroke(Color.white.opacity(camera.selectedProfile == profile ? 0.0 : 0.14), lineWidth: 0.6)
@@ -2347,7 +2349,8 @@ struct ContentView: View {
                         }
                         .foregroundStyle(.white)
                         .frame(width: 52, height: 52)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(camera.selectedProfile.badgeColor.opacity(0.55), lineWidth: 0.9)
@@ -2400,7 +2403,8 @@ struct ContentView: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(.ultraThinMaterial, in: Capsule())
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
                         
                         Spacer()
                         
@@ -2410,7 +2414,8 @@ struct ContentView: View {
                         .font(.system(size: 14, weight: .bold))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(camera.selectedProfile.badgeColor, in: Capsule())
+                        .background(camera.selectedProfile.badgeColor)
+                        .clipShape(Capsule())
                         .foregroundStyle(.black)
                     }
                     .padding(20)
@@ -2432,7 +2437,8 @@ struct ContentView: View {
                 .foregroundStyle(activeDrawerTab == index ? .black : .white.opacity(0.8))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(activeDrawerTab == index ? Color.white : Color.white.opacity(0.12), in: Capsule())
+                .background(activeDrawerTab == index ? Color.white : Color.white.opacity(0.12))
+                .clipShape(Capsule())
         }
     }
     
