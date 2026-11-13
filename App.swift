@@ -19,9 +19,11 @@ struct oCamApp: App {
     }
 }
 
-// MARK: - 1. Catálogo de Cámaras Cinematográficas (Colores Fieles + Intervención Tonal/Óptica)
+// MARK: - 1. Catálogo de 16 Cámaras Cinematográficas y Retro de oCam
 enum FilmProfile: String, CaseIterable, Identifiable {
     case ocamMaster = "oCam"
+    case cineChrome = "Palms 70s"
+    case kodak2383 = "Kodak 2383"
     case nocturnaClub = "Nocturna"
     case portra400 = "Portra 400"
     case cinestill800T = "800T"
@@ -31,42 +33,52 @@ enum FilmProfile: String, CaseIterable, Identifiable {
     case superia400 = "Superia"
     case velvia50 = "Velvia 50"
     case gold200 = "Gold 200"
+    case aerochrome = "Aero IR"
     case bleachBypass = "Bleach"
+    case ilfordHP5 = "Ilford HP5"
     case triX400 = "Tri-X B&W"
     
     var id: String { self.rawValue }
     
     var subtitle: String {
         switch self {
-        case .ocamMaster: return "NATURAL FILM ROLL-OFF"
-        case .nocturnaClub: return "LOW LIGHT & NEON"
-        case .portra400: return "TRUE SKIN & SOFT HIGHLIGHT"
+        case .ocamMaster: return "TRUE COLOR FILM ROLL-OFF"
+        case .cineChrome: return "WARM PALMS & DEEP GREENS"
+        case .kodak2383: return "HOLLYWOOD PRINT LUT"
+        case .nocturnaClub: return "CLUB & NEON LOW LIGHT"
+        case .portra400: return "NATURAL SKIN & SOFT LIGHT"
         case .cinestill800T: return "TUNGSTEN HALATION"
-        case .dispo98: return "90s ANALOG CONTRAST"
-        case .ccd2004: return "CRISP DIGICAM"
-        case .polaroid600: return "SOFT MATTE SHADOWS"
-        case .superia400: return "DEEP FOLIAGE"
-        case .velvia50: return "RICH CONTRAST"
-        case .gold200: return "SUBTLE DAYLIGHT"
-        case .bleachBypass: return "SILVER RETENTION"
-        case .triX400: return "CLASSIC B&W 400"
+        case .dispo98: return "90s POCKET FLASH"
+        case .ccd2004: return "EARLY 2000s DIGICAM"
+        case .polaroid600: return "CREAMY INSTANT FRAME"
+        case .superia400: return "EMERALD SHADOWS"
+        case .velvia50: return "RICH SLIDE CHROME"
+        case .gold200: return "GOLDEN HOUR VINTAGE"
+        case .aerochrome: return "INFRARED CRIMSON FOLIAGE"
+        case .bleachBypass: return "METALLIC CINEMA GRIT"
+        case .ilfordHP5: return "SOFT DOCUMENTARY B&W"
+        case .triX400: return "HIGH CONTRAST MONO"
         }
     }
     
     var badgeColor: Color {
         switch self {
-        case .ocamMaster: return Color(red: 0.90, green: 0.82, blue: 0.68)
-        case .nocturnaClub: return Color(red: 0.95, green: 0.55, blue: 0.42)
-        case .portra400: return Color(red: 0.92, green: 0.72, blue: 0.54)
-        case .cinestill800T: return Color(red: 0.48, green: 0.80, blue: 0.94)
-        case .dispo98: return Color(red: 0.55, green: 0.88, blue: 0.68)
-        case .ccd2004: return Color(red: 0.78, green: 0.70, blue: 0.96)
-        case .polaroid600: return Color(red: 0.94, green: 0.80, blue: 0.72)
-        case .superia400: return Color(red: 0.45, green: 0.84, blue: 0.62)
-        case .velvia50: return Color(red: 0.92, green: 0.52, blue: 0.52)
-        case .gold200: return Color(red: 0.94, green: 0.82, blue: 0.48)
+        case .ocamMaster: return Color(red: 0.92, green: 0.84, blue: 0.70)
+        case .cineChrome: return Color(red: 0.94, green: 0.76, blue: 0.48)
+        case .kodak2383: return Color(red: 0.48, green: 0.82, blue: 0.86)
+        case .nocturnaClub: return Color(red: 0.96, green: 0.52, blue: 0.40)
+        case .portra400: return Color(red: 0.94, green: 0.70, blue: 0.52)
+        case .cinestill800T: return Color(red: 0.42, green: 0.78, blue: 0.96)
+        case .dispo98: return Color(red: 0.52, green: 0.90, blue: 0.66)
+        case .ccd2004: return Color(red: 0.78, green: 0.68, blue: 0.96)
+        case .polaroid600: return Color(red: 0.95, green: 0.80, blue: 0.72)
+        case .superia400: return Color(red: 0.42, green: 0.86, blue: 0.60)
+        case .velvia50: return Color(red: 0.94, green: 0.50, blue: 0.50)
+        case .gold200: return Color(red: 0.96, green: 0.84, blue: 0.44)
+        case .aerochrome: return Color(red: 0.98, green: 0.36, blue: 0.52)
         case .bleachBypass: return Color(red: 0.76, green: 0.80, blue: 0.84)
-        case .triX400: return Color(white: 0.90)
+        case .ilfordHP5: return Color(white: 0.82)
+        case .triX400: return Color(white: 0.92)
         }
     }
     
@@ -77,38 +89,48 @@ enum FilmProfile: String, CaseIterable, Identifiable {
         let bloom: Float
         let grain: Float
         let vignette: Float
+        let fadeMatte: Float
+        let saturationAdjust: Float
         let nightMode: Bool
     }
     
-    // Calibración de fábrica: CERO dominante amarilla (warmth = 0.0), foco en curva tonal, roll-off y textura
     var recommended: RecommendedSettings {
         switch self {
         case .ocamMaster:
-            // Exacto a la 2da foto de las palmeras: colores conservados, sombras densas, luces suaves y desaturación orgánica
-            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.68, warmth: 0.0, bloom: 0.28, grain: 0.26, vignette: 0.24, nightMode: false)
+            // Mantiene la limpieza de tus fotos 4 y 5 de 48MP con sutil estética de cine analógico
+            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.65, warmth: 0.0, bloom: 0.30, grain: 0.24, vignette: 0.24, fadeMatte: 0.14, saturationAdjust: -0.10, nightMode: false)
+        case .cineChrome:
+            // Calibrada exactamente como la 2da foto de las palmeras: desaturación orgánica, cielo cremoso y sombras profundas
+            return RecommendedSettings(ev: -0.40, contrastSCurve: 0.74, warmth: 0.06, bloom: 0.36, grain: 0.30, vignette: 0.30, fadeMatte: 0.22, saturationAdjust: -0.16, nightMode: false)
+        case .kodak2383:
+            // Película de impresión de cine: contraste rico y separación cromática limpia
+            return RecommendedSettings(ev: -0.40, contrastSCurve: 0.78, warmth: 0.0, bloom: 0.34, grain: 0.26, vignette: 0.32, fadeMatte: 0.18, saturationAdjust: -0.08, nightMode: false)
         case .nocturnaClub:
-            // Noche limpia: protege altas luces sin teñir de amarillo las lámparas de interior
-            return RecommendedSettings(ev: -0.55, contrastSCurve: 0.74, warmth: -0.05, bloom: 0.55, grain: 0.34, vignette: 0.35, nightMode: true)
+            return RecommendedSettings(ev: -0.55, contrastSCurve: 0.72, warmth: -0.04, bloom: 0.58, grain: 0.32, vignette: 0.36, fadeMatte: 0.12, saturationAdjust: -0.05, nightMode: true)
         case .portra400:
-            return RecommendedSettings(ev: -0.25, contrastSCurve: 0.52, warmth: 0.04, bloom: 0.25, grain: 0.22, vignette: 0.18, nightMode: false)
+            return RecommendedSettings(ev: -0.25, contrastSCurve: 0.54, warmth: 0.03, bloom: 0.26, grain: 0.22, vignette: 0.20, fadeMatte: 0.16, saturationAdjust: -0.06, nightMode: false)
         case .cinestill800T:
-            return RecommendedSettings(ev: -0.45, contrastSCurve: 0.66, warmth: -0.18, bloom: 0.60, grain: 0.35, vignette: 0.32, nightMode: true)
+            return RecommendedSettings(ev: -0.45, contrastSCurve: 0.68, warmth: -0.14, bloom: 0.62, grain: 0.34, vignette: 0.32, fadeMatte: 0.12, saturationAdjust: -0.06, nightMode: true)
         case .dispo98:
-            return RecommendedSettings(ev: -0.20, contrastSCurve: 0.70, warmth: 0.0, bloom: 0.35, grain: 0.52, vignette: 0.42, nightMode: false)
+            return RecommendedSettings(ev: -0.20, contrastSCurve: 0.70, warmth: 0.0, bloom: 0.35, grain: 0.50, vignette: 0.42, fadeMatte: 0.28, saturationAdjust: -0.08, nightMode: false)
         case .ccd2004:
-            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.60, warmth: 0.0, bloom: 0.15, grain: 0.20, vignette: 0.22, nightMode: false)
+            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.62, warmth: 0.0, bloom: 0.16, grain: 0.18, vignette: 0.22, fadeMatte: 0.05, saturationAdjust: 0.06, nightMode: false)
         case .polaroid600:
-            return RecommendedSettings(ev: -0.15, contrastSCurve: 0.45, warmth: 0.05, bloom: 0.40, grain: 0.30, vignette: 0.36, nightMode: false)
+            return RecommendedSettings(ev: -0.15, contrastSCurve: 0.48, warmth: 0.04, bloom: 0.42, grain: 0.28, vignette: 0.38, fadeMatte: 0.34, saturationAdjust: -0.14, nightMode: false)
         case .superia400:
-            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.64, warmth: 0.0, bloom: 0.22, grain: 0.28, vignette: 0.24, nightMode: false)
+            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.64, warmth: 0.0, bloom: 0.24, grain: 0.28, vignette: 0.24, fadeMatte: 0.14, saturationAdjust: -0.05, nightMode: false)
         case .velvia50:
-            return RecommendedSettings(ev: -0.40, contrastSCurve: 0.76, warmth: 0.0, bloom: 0.20, grain: 0.16, vignette: 0.28, nightMode: false)
+            return RecommendedSettings(ev: -0.40, contrastSCurve: 0.76, warmth: 0.0, bloom: 0.20, grain: 0.16, vignette: 0.28, fadeMatte: 0.06, saturationAdjust: 0.12, nightMode: false)
         case .gold200:
-            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.62, warmth: 0.08, bloom: 0.30, grain: 0.26, vignette: 0.24, nightMode: false)
+            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.62, warmth: 0.06, bloom: 0.32, grain: 0.26, vignette: 0.26, fadeMatte: 0.20, saturationAdjust: -0.04, nightMode: false)
+        case .aerochrome:
+            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.70, warmth: 0.0, bloom: 0.30, grain: 0.26, vignette: 0.28, fadeMatte: 0.10, saturationAdjust: 0.05, nightMode: false)
         case .bleachBypass:
-            return RecommendedSettings(ev: -0.45, contrastSCurve: 0.82, warmth: -0.08, bloom: 0.12, grain: 0.45, vignette: 0.45, nightMode: false)
+            return RecommendedSettings(ev: -0.45, contrastSCurve: 0.82, warmth: -0.05, bloom: 0.14, grain: 0.44, vignette: 0.44, fadeMatte: 0.15, saturationAdjust: -0.48, nightMode: false)
+        case .ilfordHP5:
+            return RecommendedSettings(ev: -0.30, contrastSCurve: 0.56, warmth: 0.0, bloom: 0.22, grain: 0.46, vignette: 0.32, fadeMatte: 0.22, saturationAdjust: -1.0, nightMode: false)
         case .triX400:
-            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.78, warmth: 0.0, bloom: 0.20, grain: 0.58, vignette: 0.40, nightMode: false)
+            return RecommendedSettings(ev: -0.35, contrastSCurve: 0.80, warmth: 0.0, bloom: 0.20, grain: 0.58, vignette: 0.40, fadeMatte: 0.10, saturationAdjust: -1.0, nightMode: false)
         }
     }
 }
@@ -152,7 +174,7 @@ struct DevelopedPhotoResult {
     let exifSummary: String
 }
 
-// MARK: - 2. Motor Cinematográfico oCam (Preservación de Color + Estética Palmeras #2)
+// MARK: - 2. Motor Cinematográfico oCam (RAW Sin Verde + 48MP Con Look Completo + Lab Preciso)
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
@@ -172,6 +194,10 @@ class CinematicPipeline {
         vignetteAmount: Float,
         warmthAdjust: Float,
         exposureAdjust: Float = 0.0,
+        shadowsAdjust: Float = 0.0,
+        highlightsAdjust: Float = 0.0,
+        fadeMatteAmount: Float = 0.14,
+        saturationAdjust: Float = 0.0,
         portraitDepthBlur: Float = 0.0,
         nightModeBoost: Bool = false,
         lightLeakEnabled: Bool = false,
@@ -184,7 +210,7 @@ class CinematicPipeline {
         guard extent.width > 0, extent.height > 0 else { return input }
         let scaleMultiplier = max(1.0, min(extent.width, extent.height) / 1080.0)
         
-        // 0. Ajuste fino de Exposición
+        // 0. Ajuste de Exposición
         if abs(exposureAdjust) > 0.02 {
             let exp = CIFilter.exposureAdjust()
             exp.inputImage = current
@@ -192,72 +218,107 @@ class CinematicPipeline {
             if let out = exp.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 1. Balance de Blancos 100% Fiel (Solo actúa si el usuario mueve el slider de Calidez o para neutralizar el verde Bayer RAW)
-        if isRAW || abs(warmthAdjust) > 0.02 {
+        // 1. Corrección de Exceso de Verde exclusiva para Bayer RAW (Los 2 fotodiodos G1/G2 del sensor RGGB bajo luz cálida)
+        // Sin usar CITemperatureAndTint forzado a 6500K, que era lo que teñía tus fotos RAW de verde lima
+        if isRAW {
+            let rawGreenFix = CIFilter.colorMatrix()
+            rawGreenFix.inputImage = current
+            rawGreenFix.rVector = CIVector(x: 1.03, y: 0.00, z: 0.00, w: 0)
+            rawGreenFix.gVector = CIVector(x: 0.00, y: 0.94, z: 0.00, w: 0) // Atenúa el exceso de canal verde del Bayer RAW
+            rawGreenFix.bVector = CIVector(x: 0.00, y: 0.00, z: 1.04, w: 0)
+            if let out = rawGreenFix.outputImage?.cropped(to: extent) { current = out }
+        }
+        
+        // Ajuste manual de temperatura (solo cuando el usuario mueve el slider de WB)
+        if abs(warmthAdjust) > 0.02 {
             let wbFix = CIFilter.temperatureAndTint()
             wbFix.inputImage = current
             wbFix.neutral = CIVector(x: 6500, y: 0)
-            let userShift = CGFloat(-warmthAdjust * 950) // Suave y controlado, sin volver amarilla la foto
-            let tintShift: CGFloat = isRAW ? 14 : 0
-            wbFix.targetNeutral = CIVector(x: 6500 + userShift, y: tintShift)
+            let userShift = CGFloat(-warmthAdjust * 850)
+            wbFix.targetNeutral = CIVector(x: 6500 + userShift, y: 0)
             if let out = wbFix.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 2. Compresión Cinematográfica de Altas Luces (Como el cielo y las casas blancas de las palmeras #2)
+        // 2. Recuperación de Altas Luces y Sombras (Con soporte para los nuevos sliders de Highlights y Shadows del Studio)
         let hs = CIFilter.highlightShadowAdjust()
         hs.inputImage = current
-        // Comprime altas luces para quitar el brillo duro digital sin lavar las sombras
-        hs.highlightAmount = nightModeBoost ? 0.18 : 0.28
-        hs.shadowAmount = nightModeBoost ? 0.32 : (isRAW ? 0.24 : 0.08)
-        hs.radius = Float(28.0 * scaleMultiplier)
+        let baseHighlight: Float = nightModeBoost ? 0.22 : 0.32
+        let baseShadow: Float = nightModeBoost ? 0.30 : (isRAW ? 0.18 : 0.08)
+        hs.highlightAmount = max(0.05, min(1.0, baseHighlight - (highlightsAdjust * 0.35)))
+        hs.shadowAmount = max(-0.5, min(1.0, baseShadow + (shadowsAdjust * 0.50)))
+        hs.radius = Float(26.0 * scaleMultiplier)
         if let out = hs.outputImage?.cropped(to: extent) { current = out }
         
-        // 3. Control de Saturación Orgánica y Vibrance (Apaga los colores chillones de smartphone como el verde radiactivo de la foto #1)
+        // 3. Emulación de Color y Desaturación Orgánica (Conservando neutros blancos como en tus fotos 4 y 5 + estética Palmeras)
         let vibrance = CIFilter.vibrance()
         vibrance.inputImage = current
         let colorControls = CIFilter.colorControls()
+        let matrix = CIFilter.colorMatrix()
         
         switch profile {
         case .ocamMaster:
-            // Estética exacta de las Palmeras #2: desatura ligeramente los colores eléctricos (-12%) manteniendo blancos neutros
+            // Limpieza de las fotos 4 y 5 + roll-off cinematográfico y verdes profundos tipo palmeras
             vibrance.amount = -0.14
             if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
             colorControls.inputImage = current
-            colorControls.saturation = 0.88
+            colorControls.saturation = max(0.0, 0.88 + saturationAdjust * 0.35)
             colorControls.contrast = 1.04
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
-            // Matriz preservadora de neutros (cada fila suma 1.00 exacto -> los blancos NUNCA se vuelven amarillos)
-            // Profundiza los verdes del follaje hacia verde pino orgánico
-            let matrix = CIFilter.colorMatrix()
+            // Split-toning analógico preservador de blancos (suma de cada fila = 1.00)
             matrix.inputImage = current
             matrix.rVector = CIVector(x: 1.02, y: 0.01, z: -0.03, w: 0)
-            matrix.gVector = CIVector(x: -0.02, y: 0.98, z: 0.04, w: 0)
-            matrix.bVector = CIVector(x: -0.02, y: -0.02, z: 1.04, w: 0)
-            matrix.biasVector = CIVector(x: 0, y: 0, z: 0, w: 0)
+            matrix.gVector = CIVector(x: -0.01, y: 0.98, z: 0.03, w: 0)
+            matrix.bVector = CIVector(x: -0.02, y: -0.01, z: 1.03, w: 0)
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
-        case .nocturnaClub:
-            // Nocturna para bares/boliches: limpia el exceso de amarillo/naranja de las luces cálidas de interior y da profundidad
+        case .cineChrome:
+            // Estética exacta de la 2da foto de las palmeras: verdes pino apagados, cielo crema sedoso y sombras densas
+            vibrance.amount = -0.20
+            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
+            colorControls.inputImage = current
+            colorControls.saturation = max(0.0, 0.83 + saturationAdjust * 0.35)
+            colorControls.contrast = 1.06
+            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            
+            matrix.inputImage = current
+            matrix.rVector = CIVector(x: 1.03, y: 0.02, z: -0.05, w: 0)
+            matrix.gVector = CIVector(x: -0.02, y: 0.97, z: 0.05, w: 0)
+            matrix.bVector = CIVector(x: -0.03, y: 0.01, z: 1.02, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
+            
+        case .kodak2383:
+            // Película de impresión de cine: sombras densas con cian muy sutil y luces piel naturales
             vibrance.amount = -0.10
             if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
             colorControls.inputImage = current
-            colorControls.saturation = 0.92
+            colorControls.saturation = max(0.0, 0.90 + saturationAdjust * 0.35)
+            colorControls.contrast = 1.07
+            if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            
+            matrix.inputImage = current
+            matrix.rVector = CIVector(x: 1.03, y: 0.01, z: -0.04, w: 0)
+            matrix.gVector = CIVector(x: 0.00, y: 0.99, z: 0.01, w: 0)
+            matrix.bVector = CIVector(x: -0.03, y: 0.02, z: 1.01, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
+            
+        case .nocturnaClub:
+            vibrance.amount = -0.10
+            if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
+            colorControls.inputImage = current
+            colorControls.saturation = max(0.0, 0.92 + saturationAdjust * 0.35)
             colorControls.contrast = 1.08
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
         case .portra400:
-            // Portra 400: Tonos pastel suaves y pieles naturales sin teñir las paredes
             vibrance.amount = -0.08
             if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
             colorControls.inputImage = current
-            colorControls.saturation = 0.92
+            colorControls.saturation = max(0.0, 0.92 + saturationAdjust * 0.35)
             colorControls.contrast = 1.02
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
         case .cinestill800T:
-            // Tungsteno: enfría ligeramente las luces amarillas de interior llevándolas a un tono neutro-frío cinematográfico
-            let matrix = CIFilter.colorMatrix()
             matrix.inputImage = current
             matrix.rVector = CIVector(x: 0.95, y: 0.03, z: 0.02, w: 0)
             matrix.gVector = CIVector(x: 0.00, y: 0.99, z: 0.01, w: 0)
@@ -265,30 +326,25 @@ class CinematicPipeline {
             if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .dispo98:
-            // Desechable 90s: Contraste medio-alto y saturación contenida
             colorControls.inputImage = current
-            colorControls.saturation = 0.90
-            colorControls.contrast = 1.09
+            colorControls.saturation = max(0.0, 0.88 + saturationAdjust * 0.35)
+            colorControls.contrast = 1.08
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
         case .ccd2004:
-            // Digicam: micro-contraste limpio y colores definidos
             colorControls.inputImage = current
-            colorControls.saturation = 1.05
+            colorControls.saturation = max(0.0, 1.05 + saturationAdjust * 0.35)
             colorControls.contrast = 1.08
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
         case .polaroid600:
-            // Instantánea: saturación suave y sombras mate
             vibrance.amount = -0.16
             if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
             colorControls.inputImage = current
-            colorControls.saturation = 0.86
+            colorControls.saturation = max(0.0, 0.85 + saturationAdjust * 0.35)
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
         case .superia400:
-            // Fuji: follaje profundo y rojos definidos mantendo blancos puros
-            let matrix = CIFilter.colorMatrix()
             matrix.inputImage = current
             matrix.rVector = CIVector(x: 1.03, y: -0.02, z: -0.01, w: 0)
             matrix.gVector = CIVector(x: -0.02, y: 1.04, z: -0.02, w: 0)
@@ -299,7 +355,7 @@ class CinematicPipeline {
             vibrance.amount = 0.12
             if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
             colorControls.inputImage = current
-            colorControls.saturation = 1.08
+            colorControls.saturation = max(0.0, 1.08 + saturationAdjust * 0.35)
             colorControls.contrast = 1.08
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
             
@@ -307,14 +363,27 @@ class CinematicPipeline {
             vibrance.amount = -0.06
             if let out = vibrance.outputImage?.cropped(to: extent) { current = out }
             colorControls.inputImage = current
-            colorControls.saturation = 0.94
+            colorControls.saturation = max(0.0, 0.93 + saturationAdjust * 0.35)
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            
+        case .aerochrome:
+            // Kodak Aerochrome IR: Intercambia el canal verde de las plantas hacia rojo rubí manteniendo blancos
+            matrix.inputImage = current
+            matrix.rVector = CIVector(x: 0.45, y: 0.65, z: -0.10, w: 0)
+            matrix.gVector = CIVector(x: 0.25, y: 0.55, z: 0.20, w: 0)
+            matrix.bVector = CIVector(x: -0.05, y: 0.10, z: 0.95, w: 0)
+            if let out = matrix.outputImage?.cropped(to: extent) { current = out }
             
         case .bleachBypass:
             colorControls.inputImage = current
-            colorControls.saturation = 0.45
+            colorControls.saturation = max(0.0, 0.45 + saturationAdjust * 0.35)
             colorControls.contrast = 1.15
             if let out = colorControls.outputImage?.cropped(to: extent) { current = out }
+            
+        case .ilfordHP5:
+            let mono = CIFilter.photoEffectMono()
+            mono.inputImage = current
+            if let out = mono.outputImage?.cropped(to: extent) { current = out }
             
         case .triX400:
             let noir = CIFilter.photoEffectNoir()
@@ -322,19 +391,17 @@ class CinematicPipeline {
             if let out = noir.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 4. Curva Tonal Cinematográfica (El corazón del look de las Palmeras #2):
-        // - Negros con peso (0.02)
-        // - Sombras densas y profundas en el cuarto inferior (0.16)
-        // - Medios tonos orgánicos (0.48)
-        // - Roll-off sedoso en altas luces (0.91) para que el cielo y las luces tengan textura de cine
+        // 4. Curva Tonal S-Curve + Matte Fade Analógico + Highlight Roll-off (Funciona igual en 12MP, RAW y 48MP)
         let sAmount = Double(contrastSCurve)
+        let matteLift = Double(fadeMatteAmount) * 0.085
         let curve = CIFilter.toneCurve()
         curve.inputImage = current
-        let blackPoint = (profile == .polaroid600 || profile == .dispo98) ? 0.045 : 0.018
-        let shadowDip = max(0.12, 0.22 - (sAmount * 0.085))
+        
+        let blackPoint = min(0.12, 0.015 + matteLift)
+        let shadowDip = max(blackPoint + 0.06, 0.22 - (sAmount * 0.085) + (matteLift * 0.35))
         let midTone = 0.49
-        let highShoulder = min(0.84, 0.75 + (sAmount * 0.06))
-        let whiteRollOff = 0.92 // Evita blancos quemados digitales como en el cielo de las palmeras #2
+        let highShoulder = min(0.85, 0.75 + (sAmount * 0.06))
+        let whiteRollOff = 0.915 // Comprime los blancos altos a crema suave como en las palmeras #2
         
         curve.point0 = CGPoint(x: 0.00, y: blackPoint)
         curve.point1 = CGPoint(x: 0.25, y: shadowDip)
@@ -343,20 +410,18 @@ class CinematicPipeline {
         curve.point4 = CGPoint(x: 1.00, y: whiteRollOff)
         if let out = curve.outputImage?.cropped(to: extent) { current = out }
         
-        // 5. Micro-contraste Óptico (Unsharp Mask de radio amplio para dar volumen tridimensional a las hojas y objetos)
-        if !is48MP {
-            let clarity = CIFilter.unsharpMask()
-            clarity.inputImage = current
-            clarity.radius = Float(14.0 * scaleMultiplier)
-            clarity.intensity = 0.24
-            if let out = clarity.outputImage?.cropped(to: extent) { current = out }
-        }
+        // 5. Micro-contraste Óptico (Ahora ACTIVO también en 48MP para darle carácter de lente analógico)
+        let clarity = CIFilter.unsharpMask()
+        clarity.inputImage = current
+        clarity.radius = Float(min(18.0, 10.0 * scaleMultiplier))
+        clarity.intensity = 0.22
+        if let out = clarity.outputImage?.cropped(to: extent) { current = out }
         
         // 6. Modo Retrato Óptico (Bokeh circular suave)
-        if !is48MP && portraitDepthBlur > 0.05 {
+        if portraitDepthBlur > 0.05 {
             let blur = CIFilter.gaussianBlur()
             blur.inputImage = current.clampedToExtent()
-            blur.radius = Float(18.0 * Double(portraitDepthBlur) * scaleMultiplier)
+            blur.radius = Float(min(26.0, 14.0 * Double(portraitDepthBlur) * scaleMultiplier))
             if let blurred = blur.outputImage?.cropped(to: extent) {
                 let mask = CIFilter.radialGradient()
                 mask.center = CGPoint(x: extent.midX, y: extent.midY)
@@ -374,21 +439,21 @@ class CinematicPipeline {
             }
         }
         
-        // 7. Halation / Difusión suave en focos de luz (Como las bombillas colgadas en las palmeras #2)
-        if !is48MP && bloomAmount > 0.04 {
+        // 7. Halation / Difusión en luces (Ahora ACTIVO también en 48MP con radio acotado seguro en GPU)
+        if bloomAmount > 0.04 {
             let bloom = CIFilter.bloom()
             bloom.inputImage = current.clampedToExtent()
-            bloom.radius = Float(14.0 * scaleMultiplier)
-            bloom.intensity = bloomAmount * (profile == .nocturnaClub ? 0.65 : 0.42)
+            bloom.radius = Float(min(18.0, 11.0 * scaleMultiplier))
+            bloom.intensity = bloomAmount * (profile == .nocturnaClub ? 0.60 : 0.38)
             if let out = bloom.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 8. Viñeteado Óptico Natural de Lente
+        // 8. Viñeteado Óptico Natural
         if vignetteAmount > 0.02 {
             let vignette = CIFilter.vignette()
             vignette.inputImage = current
-            vignette.intensity = vignetteAmount * 1.35
-            vignette.radius = 1.75
+            vignette.intensity = vignetteAmount * 1.40
+            vignette.radius = 1.72
             if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         }
         
@@ -422,11 +487,11 @@ class CinematicPipeline {
             }
         }
         
-        // 11. Grano 35mm Real Escalado a los Megapíxeles (Monocromático puro, sin teñir colores)
+        // 11. Grano 35mm Real Escalado a los Megapíxeles (Se ve idéntico en 12MP, 48MP y Studio)
         if grainAmount > 0.02, let rawNoise = CIFilter.randomGenerator().outputImage {
-            let grainScale = max(1.8, min(extent.width, extent.height) / 950.0)
+            let grainScale = max(1.8, min(extent.width, extent.height) / 920.0)
             let scaledNoise = rawNoise.transformed(by: CGAffineTransform(scaleX: grainScale, y: grainScale))
-            let grainStrength = CGFloat(grainAmount * 0.20)
+            let grainStrength = CGFloat(grainAmount * 0.22)
             
             let centeredGrain = scaledNoise.applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: grainStrength, y: 0, z: 0, w: 0),
@@ -445,6 +510,18 @@ class CinematicPipeline {
         }
         
         return current
+    }
+    
+    /// Funde dos fotos químicamente cuando está activo el modo Doble Exposición Analógica
+    func blendDoubleExposure(base: UIImage, overlay: UIImage) -> UIImage {
+        let size = base.size
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { _ in
+            base.draw(in: CGRect(origin: .zero, size: size))
+            overlay.draw(in: CGRect(origin: .zero, size: size), blendMode: .screen, alpha: 0.65)
+        }
     }
     
     func applyFinalTouches(
@@ -588,6 +665,10 @@ class CinematicPipeline {
         vignetteAmount: Float,
         warmthAdjust: Float,
         exposureAdjust: Float,
+        shadowsAdjust: Float,
+        highlightsAdjust: Float,
+        fadeMatteAmount: Float,
+        saturationAdjust: Float,
         portraitDepthBlur: Float,
         lightLeakEnabled: Bool,
         anamorphicMode: Bool
@@ -601,6 +682,10 @@ class CinematicPipeline {
             vignetteAmount: vignetteAmount,
             warmthAdjust: warmthAdjust,
             exposureAdjust: exposureAdjust,
+            shadowsAdjust: shadowsAdjust,
+            highlightsAdjust: highlightsAdjust,
+            fadeMatteAmount: fadeMatteAmount,
+            saturationAdjust: saturationAdjust,
             portraitDepthBlur: portraitDepthBlur,
             nightModeBoost: profile == .nocturnaClub,
             lightLeakEnabled: lightLeakEnabled,
@@ -616,6 +701,7 @@ class CinematicPipeline {
         data: Data,
         rawMetadata: [String: Any]?,
         wasCapturedAsRAW: Bool,
+        cameraWhiteBalanceTempAndTint: (temp: Float, tint: Float)? = nil,
         profile: FilmProfile,
         contrastSCurve: Float,
         bloomAmount: Float,
@@ -623,6 +709,10 @@ class CinematicPipeline {
         vignetteAmount: Float,
         warmthAdjust: Float,
         exposureAdjust: Float = 0.0,
+        shadowsAdjust: Float = 0.0,
+        highlightsAdjust: Float = 0.0,
+        fadeMatteAmount: Float = 0.14,
+        saturationAdjust: Float = 0.0,
         portraitDepthBlur: Float = 0.0,
         nightModeBoost: Bool = false,
         lightLeakEnabled: Bool = false,
@@ -650,24 +740,30 @@ class CinematicPipeline {
         default: targetExifOrientation = .right
         }
         
-        if wasCapturedAsRAW, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
-            rawFilter.luminanceNoiseReductionAmount = nightModeBoost ? 0.88 : 0.78
-            rawFilter.colorNoiseReductionAmount = 0.94
-            rawFilter.sharpnessAmount = 0.22
-            rawFilter.localToneMapAmount = 0.20
-            rawFilter.boostAmount = 0.48
-            rawFilter.baselineExposure = -0.35
+        // Solo usar CIRAWFilter si realmente es un DNG/RAW de cámara (NO en fotos JPEG de la galería para que el Lab sea 100% preciso)
+        if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
+            rawFilter.luminanceNoiseReductionAmount = nightModeBoost ? 0.88 : 0.80
+            rawFilter.colorNoiseReductionAmount = 0.96
+            rawFilter.sharpnessAmount = 0.24
+            // CRÍTICO: localToneMapAmount = 0.0 evita el halo oscuro/verdoso raro que salió alrededor de tu lámpara en la foto RAW #2 y #3
+            rawFilter.localToneMapAmount = 0.0
+            rawFilter.boostAmount = 0.50
+            rawFilter.baselineExposure = -0.20
             rawFilter.scaleFactor = 1.0
             
+            // Inyectar la temperatura y tinte reales medidos por el sensor al disparar para que el blanco sea idéntico al de 48MP
+            if let wb = cameraWhiteBalanceTempAndTint, wb.temp > 2000 && wb.temp < 10000 {
+                rawFilter.neutralTemperature = wb.temp
+                rawFilter.neutralTint = wb.tint
+            }
+            
             if var rawOut = rawFilter.outputImage {
-                if !isFromGallery {
-                    if rawOut.extent.width > rawOut.extent.height {
-                        rawOut = rawOut.oriented(targetExifOrientation)
-                    } else if deviceOrientation == .landscapeLeft {
-                        rawOut = rawOut.oriented(.left)
-                    } else if deviceOrientation == .landscapeRight {
-                        rawOut = rawOut.oriented(.right)
-                    }
+                if rawOut.extent.width > rawOut.extent.height {
+                    rawOut = rawOut.oriented(targetExifOrientation)
+                } else if deviceOrientation == .landscapeLeft {
+                    rawOut = rawOut.oriented(.left)
+                } else if deviceOrientation == .landscapeRight {
+                    rawOut = rawOut.oriented(.right)
                 }
                 baseImage = rawOut
                 usedCIRAW = true
@@ -698,6 +794,10 @@ class CinematicPipeline {
             vignetteAmount: vignetteAmount,
             warmthAdjust: warmthAdjust,
             exposureAdjust: exposureAdjust,
+            shadowsAdjust: shadowsAdjust,
+            highlightsAdjust: highlightsAdjust,
+            fadeMatteAmount: fadeMatteAmount,
+            saturationAdjust: saturationAdjust,
             portraitDepthBlur: portraitDepthBlur,
             nightModeBoost: nightModeBoost,
             lightLeakEnabled: lightLeakEnabled,
@@ -732,7 +832,7 @@ class CinematicPipeline {
     }
 }
 
-// MARK: - 3. Controlador de Hardware oCam
+// MARK: - 3. Controlador de Hardware oCam (48MP por defecto + Doble Exposición + Horizonte)
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     let session = AVCaptureSession()
@@ -746,23 +846,28 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     private var max48MPDimension: CMVideoDimensions?
     
     var capturedImage: UIImage?
+    var doubleExposureFirstShot: UIImage? // Almacena la primera toma en modo Doble Exposición
     var isProcessing = false
     var isRAWActive = false
     var is48MPSupported = false
-    var use48MPMode = false
-    var useRAWCapture = true
-    var statusMessage = "oCam READY"
+    var use48MPMode = true     // Arranca en 48MP PRO por defecto porque dio los mejores colores en tus pruebas
+    var useRAWCapture = false
+    var doubleExposureEnabled = false
+    var showHorizonAndHistogram = false
+    var horizonAngleDegrees: Double = 0.0
+    var statusMessage = "48MP PRO"
     var lastExifSummary = "1/125s | f/1.6 | ISO 64"
     var currentZoom: CGFloat = 1.0
     var selectedProfile: FilmProfile = .ocamMaster
     
-    // Valores por defecto calibrados con CERO tinte amarillo (warmth = 0.0) y estética de las palmeras #2
     var exposureEV: Float = -0.35
-    var contrastSCurve: Float = 0.68
+    var contrastSCurve: Float = 0.65
     var warmth: Float = 0.0
-    var bloomIntensity: Float = 0.28
-    var grainIntensity: Float = 0.26
+    var bloomIntensity: Float = 0.30
+    var grainIntensity: Float = 0.24
     var vignetteIntensity: Float = 0.24
+    var fadeMatteAmount: Float = 0.14
+    var saturationAdjust: Float = -0.10
     var portraitDepthBlur: Float = 0.0
     var nightModeEnabled = false
     var shutterSpeed: ShutterSpeedOption = .auto
@@ -801,6 +906,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         bloomIntensity = rec.bloom
         grainIntensity = rec.grain
         vignetteIntensity = rec.vignette
+        fadeMatteAmount = rec.fadeMatte
+        saturationAdjust = rec.saturationAdjust
         nightModeEnabled = rec.nightMode
         setExposure(rec.ev)
         updateNightModeHardware()
@@ -813,6 +920,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         bloomIntensity = 0.0
         grainIntensity = 0.0
         vignetteIntensity = 0.0
+        fadeMatteAmount = 0.0
+        saturationAdjust = 0.0
         portraitDepthBlur = 0.0
         nightModeEnabled = false
         setExposure(0.0)
@@ -821,9 +930,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     
     private func startMotionTracking() {
         guard motionManager.isAccelerometerAvailable else { return }
-        motionManager.accelerometerUpdateInterval = 0.25
+        motionManager.accelerometerUpdateInterval = 0.12
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self = self, let acc = data?.acceleration else { return }
+            let angle = atan2(acc.x, -acc.y) * 180.0 / .pi
+            self.horizonAngleDegrees = angle
             if abs(acc.y) > abs(acc.x) {
                 self.physicalOrientation = acc.y < 0 ? .portrait : .portraitUpsideDown
             } else {
@@ -884,6 +995,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         
         DispatchQueue.main.async {
             self.is48MPSupported = supports48
+            if !supports48 && self.use48MPMode {
+                self.use48MPMode = false
+            }
         }
     }
     
@@ -968,20 +1082,20 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     
     func toggleSensorMode() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        if useRAWCapture {
+        if use48MPMode {
+            use48MPMode = false
+            useRAWCapture = true
+        } else if useRAWCapture {
+            useRAWCapture = false
+            use48MPMode = false
+        } else {
             if is48MPSupported && currentZoom == 1.0 {
-                useRAWCapture = false
                 use48MPMode = true
-            } else {
                 useRAWCapture = false
+            } else {
+                useRAWCapture = true
                 use48MPMode = false
             }
-        } else if use48MPMode {
-            use48MPMode = false
-            useRAWCapture = false
-        } else {
-            useRAWCapture = true
-            use48MPMode = false
         }
         
         let want48 = use48MPMode && is48MPSupported && (currentZoom == 1.0)
@@ -1000,8 +1114,10 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let hasRAW = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
         DispatchQueue.main.async {
             self.isRAWActive = hasRAW
-            if self.nightModeEnabled {
-                self.statusMessage = "MODO NOCHE ACTIVO"
+            if self.doubleExposureEnabled {
+                self.statusMessage = self.doubleExposureFirstShot == nil ? "2X EXP: TOMA 1/2" : "2X EXP: TOMA 2/2"
+            } else if self.nightModeEnabled {
+                self.statusMessage = "MODO NOCHE"
             } else if self.currentZoom != 1.0 {
                 self.statusMessage = "LENTE \(self.currentZoom == 0.5 ? "0.5x" : "2x") 12MP"
             } else if self.use48MPMode && self.is48MPSupported {
@@ -1033,34 +1149,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             device.setExposureTargetBias(clampedEV, completionHandler: nil)
             device.unlockForConfiguration()
         } catch {}
-    }
-    
-    func applyShutterSpeed(_ speed: ShutterSpeedOption) {
-        shutterSpeed = speed
-        sessionQueue.async {
-            guard let device = self.currentDevice else { return }
-            do {
-                try device.lockForConfiguration()
-                if speed == .auto {
-                    device.exposureMode = .continuousAutoExposure
-                } else {
-                    var duration = CMTime.invalid
-                    var iso: Float = device.iso
-                    switch speed {
-                    case .s1_1000: duration = CMTimeMake(value: 1, timescale: 1000); iso = 320
-                    case .s1_250: duration = CMTimeMake(value: 1, timescale: 250); iso = 160
-                    case .s1_60: duration = CMTimeMake(value: 1, timescale: 60); iso = 100
-                    case .s1_15: duration = CMTimeMake(value: 1, timescale: 15); iso = 80
-                    case .s1_4: duration = CMTimeMake(value: 1, timescale: 4); iso = 64
-                    case .auto: break
-                    }
-                    if duration.isValid {
-                        device.setExposureModeCustom(duration: duration, iso: iso, completionHandler: nil)
-                    }
-                }
-                device.unlockForConfiguration()
-            } catch {}
-        }
     }
     
     func switchCameraLens(factor: CGFloat) {
@@ -1210,6 +1298,13 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             return
         }
         
+        // Leer temperatura y tinte reales del sensor en el instante del disparo para calibrar el Bayer RAW sin verde
+        var measuredWB: (temp: Float, tint: Float)? = nil
+        if let dev = self.currentDevice {
+            let tt = dev.temperatureAndTintValues(for: dev.deviceWhiteBalanceGains)
+            measuredWB = (tt.temperature, tt.tint)
+        }
+        
         let wasRAW = photo.isRawPhoto
         let photoMeta = photo.metadata
         let profile = self.selectedProfile
@@ -1218,6 +1313,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let grain = self.grainIntensity
         let vignette = self.vignetteIntensity
         let warmth = self.warmth
+        let fade = self.fadeMatteAmount
+        let sat = self.saturationAdjust
         let portrait = self.portraitDepthBlur
         let night = self.nightModeEnabled
         let leak = self.lightLeakEnabled
@@ -1226,12 +1323,15 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let ratio = self.aspectRatio
         let frame = self.frameStyle
         let angle = self.physicalOrientation
+        let isDoubleExp = self.doubleExposureEnabled
+        let firstShot = self.doubleExposureFirstShot
         
         Task.detached(priority: .userInitiated) {
             let result = CinematicPipeline.shared.developFinalPhoto(
                 data: data,
                 rawMetadata: photoMeta,
                 wasCapturedAsRAW: wasRAW,
+                cameraWhiteBalanceTempAndTint: measuredWB,
                 profile: profile,
                 contrastSCurve: sCurve,
                 bloomAmount: bloom,
@@ -1239,6 +1339,10 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 vignetteAmount: vignette,
                 warmthAdjust: warmth,
                 exposureAdjust: 0.0,
+                shadowsAdjust: 0.0,
+                highlightsAdjust: 0.0,
+                fadeMatteAmount: fade,
+                saturationAdjust: sat,
                 portraitDepthBlur: portrait,
                 nightModeBoost: night,
                 lightLeakEnabled: leak,
@@ -1249,7 +1353,28 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 deviceOrientation: angle
             )
             
-            if let jpegData = result.jpegData {
+            guard var finalUIImage = result.previewImage else {
+                await MainActor.run { self.isProcessing = false }
+                return
+            }
+            
+            // Si está activo Doble Exposición y es la toma 1/2, guardarla como fantasma en el visor y esperar la 2da foto
+            if isDoubleExp && firstShot == nil {
+                await MainActor.run {
+                    self.doubleExposureFirstShot = finalUIImage
+                    self.statusMessage = "2X EXP: TOMA 2/2"
+                    self.isProcessing = false
+                }
+                return
+            }
+            
+            var finalDataToSave = result.jpegData
+            if isDoubleExp, let baseShot = firstShot {
+                finalUIImage = CinematicPipeline.shared.blendDoubleExposure(base: baseShot, overlay: finalUIImage)
+                finalDataToSave = finalUIImage.jpegData(compressionQuality: 0.96)
+            }
+            
+            if let jpegData = finalDataToSave {
                 PHPhotoLibrary.shared().performChanges({
                     let creationRequest = PHAssetCreationRequest.forAsset()
                     creationRequest.addResource(with: .photo, data: jpegData, options: nil)
@@ -1257,10 +1382,10 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                     DispatchQueue.main.async {
                         if success {
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            self.statusMessage = result.status
+                            self.statusMessage = isDoubleExp ? "2X EXP GUARDADA" : result.status
                             self.lastExifSummary = result.exifSummary
-                        } else if let preview = result.previewImage {
-                            UIImageWriteToSavedPhotosAlbum(preview, nil, nil, nil)
+                        } else {
+                            UIImageWriteToSavedPhotosAlbum(finalUIImage, nil, nil, nil)
                             self.statusMessage = "GUARDADA"
                         }
                     }
@@ -1268,7 +1393,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             }
             
             await MainActor.run {
-                self.capturedImage = result.previewImage
+                self.doubleExposureFirstShot = nil
+                self.capturedImage = finalUIImage
                 self.isProcessing = false
             }
         }
@@ -1310,10 +1436,11 @@ struct NativeCameraPreview: UIViewRepresentable {
     }
 }
 
-// MARK: - 5. Capa de Previsualización Fiel en Vivo (Sin tinte amarillo artificial)
+// MARK: - 5. Capa de Previsualización Fiel en Vivo + Fantasma de Doble Exposición + Horizonte
 struct LiveOpticalEffectsView: View {
     let profile: FilmProfile
     let contrastSCurve: Float
+    let fadeMatteAmount: Float
     let vignetteIntensity: Float
     let grainIntensity: Float
     let bloomIntensity: Float
@@ -1323,6 +1450,7 @@ struct LiveOpticalEffectsView: View {
     let anamorphicMode: Bool
     let dateStampEnabled: Bool
     let frameStyle: FrameStyleOption
+    let doubleExposureGhost: UIImage?
     
     private var currentDateStamp: String {
         let df = DateFormatter()
@@ -1334,6 +1462,24 @@ struct LiveOpticalEffectsView: View {
         GeometryReader { geo in
             ZStack {
                 filmLiveOverlay(for: profile)
+                
+                // Matte Fade Analógico en vivo
+                if fadeMatteAmount > 0.02 {
+                    Color(white: 0.14)
+                        .opacity(Double(fadeMatteAmount) * 0.22)
+                        .blendMode(.screen)
+                }
+                
+                // Fantasma de la primera foto cuando está activa la Doble Exposición
+                if let ghost = doubleExposureGhost {
+                    Image(uiImage: ghost)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .opacity(0.42)
+                        .blendMode(.screen)
+                        .clipped()
+                }
                 
                 if abs(warmth) > 0.02 {
                     (warmth > 0
@@ -1360,7 +1506,7 @@ struct LiveOpticalEffectsView: View {
                 if bloomIntensity > 0.04 {
                     RadialGradient(
                         colors: [
-                            Color.white.opacity(Double(bloomIntensity) * 0.16),
+                            Color.white.opacity(Double(bloomIntensity) * 0.15),
                             profile.badgeColor.opacity(Double(bloomIntensity) * 0.08),
                             .clear
                         ],
@@ -1460,8 +1606,7 @@ struct LiveOpticalEffectsView: View {
     @ViewBuilder
     private func filmLiveOverlay(for profile: FilmProfile) -> some View {
         switch profile {
-        case .ocamMaster:
-            // Sin tinte amarillo: solo caída suave de altas luces arriba y densidad abajo como en las palmeras #2
+        case .ocamMaster, .cineChrome, .kodak2383:
             LinearGradient(
                 colors: [
                     Color(white: 0.95).opacity(0.06),
@@ -1472,16 +1617,8 @@ struct LiveOpticalEffectsView: View {
                 endPoint: .bottom
             )
             .blendMode(.softLight)
-        case .nocturnaClub:
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    Color(red: 0.05, green: 0.12, blue: 0.22).opacity(0.14)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .blendMode(.softLight)
+        case .aerochrome:
+            Color(red: 0.95, green: 0.20, blue: 0.45).opacity(0.14).blendMode(.softLight)
         case .cinestill800T:
             Color(red: 0.20, green: 0.65, blue: 0.95).opacity(0.08).blendMode(.softLight)
         default:
@@ -1502,26 +1639,32 @@ struct SeededRandomGenerator: RandomNumberGenerator {
     }
 }
 
-// MARK: - 6. Laboratorio oCam Studio
+// MARK: - 6. Laboratorio oCam Studio de Alta Precisión (2400px + Antes/Después + Sombras/Luces/Fade)
 struct GalleryDarkroomView: View {
     let originalData: Data
     var onSaveSuccess: (UIImage, String) -> Void
     @Environment(\.dismiss) private var dismiss
     
-    @State private var selectedProfile: FilmProfile = .ocamMaster
+    @State private var selectedProfile: FilmProfile = .cineChrome
     @State private var activeTab: Int = 0
     @State private var exposureAdjust: Float = 0.0
-    @State private var contrastSCurve: Float = 0.68
-    @State private var warmthAdjust: Float = 0.0
-    @State private var bloomAmount: Float = 0.28
-    @State private var grainAmount: Float = 0.26
-    @State private var vignetteAmount: Float = 0.24
+    @State private var contrastSCurve: Float = 0.74
+    @State private var shadowsAdjust: Float = 0.0
+    @State private var highlightsAdjust: Float = 0.25
+    @State private var fadeMatteAmount: Float = 0.22
+    @State private var saturationAdjust: Float = -0.16
+    @State private var warmthAdjust: Float = 0.06
+    @State private var bloomAmount: Float = 0.36
+    @State private var grainAmount: Float = 0.30
+    @State private var vignetteAmount: Float = 0.30
     @State private var portraitDepthBlur: Float = 0.0
     @State private var lightLeakEnabled = false
     @State private var dateStampEnabled = false
     @State private var aspectRatio: AspectRatioOption = .fourThree
     @State private var frameStyle: FrameStyleOption = .none
     @State private var previewImage: UIImage?
+    @State private var originalPreviewImage: UIImage?
+    @State private var isShowingOriginal = false
     @State private var scaledCIImage: CIImage?
     @State private var isSaving = false
     
@@ -1529,7 +1672,8 @@ struct GalleryDarkroomView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
+                // Barra Superior
                 HStack(spacing: 10) {
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1546,11 +1690,29 @@ struct GalleryDarkroomView: View {
                     
                     Spacer()
                     
+                    // Botón para ver el Antes / Después al tocar
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        isShowingOriginal.toggle()
+                    } label: {
+                        Text(isShowingOriginal ? "ORIGINAL" : "COMPARAR")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(isShowingOriginal ? .black : .white)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 8)
+                            .background(isShowingOriginal ? Color.white : Color.white.opacity(0.14))
+                            .clipShape(Capsule())
+                    }
+                    
                     Menu {
                         Button("Recomendado (\(selectedProfile.rawValue))", systemImage: "sparkles") {
                             let rec = selectedProfile.recommended
                             exposureAdjust = 0.0
                             contrastSCurve = rec.contrastSCurve
+                            shadowsAdjust = 0.0
+                            highlightsAdjust = 0.20
+                            fadeMatteAmount = rec.fadeMatte
+                            saturationAdjust = rec.saturationAdjust
                             warmthAdjust = rec.warmth
                             bloomAmount = rec.bloom
                             grainAmount = rec.grain
@@ -1560,6 +1722,10 @@ struct GalleryDarkroomView: View {
                         Button("Restablecer a Cero", systemImage: "arrow.counterclockwise") {
                             exposureAdjust = 0.0
                             contrastSCurve = 0.35
+                            shadowsAdjust = 0.0
+                            highlightsAdjust = 0.0
+                            fadeMatteAmount = 0.0
+                            saturationAdjust = 0.0
                             warmthAdjust = 0.0
                             bloomAmount = 0.0
                             grainAmount = 0.0
@@ -1598,44 +1764,50 @@ struct GalleryDarkroomView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 
+                // Visor de Alta Precisión (2200px)
                 ZStack(alignment: .topTrailing) {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(Color(white: 0.05))
                     
-                    if let preview = previewImage {
+                    if let preview = (isShowingOriginal ? originalPreviewImage : previewImage) {
                         Image(uiImage: preview)
                             .resizable()
                             .scaledToFit()
                             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .padding(8)
+                            .padding(6)
                     } else {
                         ProgressView().tint(.white)
                     }
                     
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("oCam Studio • \(selectedProfile.rawValue)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.9))
-                        Text("Roll-Off S-Curve \(String(format: "%.2f", contrastSCurve * 4.0)) | f/1.6")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.65))
+                        Text(isShowingOriginal ? "ORIGINAL SIN FILTRO" : "oCam Studio • \(selectedProfile.rawValue)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.95))
+                        Text("S-Curve \(String(format: "%.2f", contrastSCurve * 4.0)) | Fade \(Int(fadeMatteAmount * 100))%")
+                            .font(.system(size: 9.5, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.70))
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .padding(16)
+                    .padding(14)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 12)
                 
-                VStack(spacing: 12) {
+                // Panel de Controles de Precisión por Pestañas
+                VStack(spacing: 10) {
                     if activeTab == 0 {
-                        darkroomSlider(title: "S-Curve & Roll-Off", value: $contrastSCurve, range: 0.0...1.0, format: "%.2f", multiplier: 4.0)
-                        darkroomSlider(title: "Exposure (EV)", value: $exposureAdjust, range: -1.5...1.5, format: "%+.2f")
-                        darkroomSlider(title: "Portrait Bokeh", value: $portraitDepthBlur, range: 0.0...1.0, format: "f/%.1f", multiplier: 1.4)
+                        darkroomSlider(title: "S-Curve Contrast", value: $contrastSCurve, range: 0.0...1.0, format: "%.2f", multiplier: 4.0)
+                        darkroomSlider(title: "Matte Fade (Roll-Off)", value: $fadeMatteAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        darkroomSlider(title: "Highlights Protect", value: $highlightsAdjust, range: -0.5...1.0, format: "%+.2f")
+                        darkroomSlider(title: "Shadows Lift / Deep", value: $shadowsAdjust, range: -0.6...0.8, format: "%+.2f")
                     } else if activeTab == 1 {
+                        darkroomSlider(title: "Exposure (EV)", value: $exposureAdjust, range: -1.5...1.5, format: "%+.2f")
+                        darkroomSlider(title: "Saturation (Organic)", value: $saturationAdjust, range: -0.6...0.5, format: "%+.2f")
                         darkroomSlider(title: "White Balance (WB)", value: $warmthAdjust, range: -1.0...1.0, format: "%+.2f")
+                        
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(FilmProfile.allCases) { profile in
@@ -1644,19 +1816,26 @@ struct GalleryDarkroomView: View {
                                         selectedProfile = profile
                                         let rec = profile.recommended
                                         contrastSCurve = rec.contrastSCurve
+                                        fadeMatteAmount = rec.fadeMatte
+                                        saturationAdjust = rec.saturationAdjust
                                         warmthAdjust = rec.warmth
                                         bloomAmount = rec.bloom
                                         grainAmount = rec.grain
                                         vignetteAmount = rec.vignette
                                         updatePreview()
                                     } label: {
-                                        Text(profile.rawValue)
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundStyle(selectedProfile == profile ? .black : .white)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(selectedProfile == profile ? profile.badgeColor : Color.white.opacity(0.12))
-                                            .clipShape(Capsule())
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(profile.rawValue)
+                                                .font(.system(size: 11, weight: .bold))
+                                            Text(profile.subtitle.prefix(14))
+                                                .font(.system(size: 8, design: .monospaced))
+                                                .opacity(0.75)
+                                        }
+                                        .foregroundStyle(selectedProfile == profile ? .black : .white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(selectedProfile == profile ? profile.badgeColor : Color.white.opacity(0.12))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
                                     }
                                 }
                             }
@@ -1665,6 +1844,7 @@ struct GalleryDarkroomView: View {
                         darkroomSlider(title: "35mm Film Grain", value: $grainAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                         darkroomSlider(title: "Halation Glow", value: $bloomAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                         darkroomSlider(title: "Optical Vignette", value: $vignetteAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        darkroomSlider(title: "Portrait Bokeh", value: $portraitDepthBlur, range: 0.0...1.0, format: "f/%.1f", multiplier: 1.4)
                     } else {
                         HStack(spacing: 8) {
                             ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
@@ -1726,7 +1906,7 @@ struct GalleryDarkroomView: View {
                     }
                 }
                 .padding(.horizontal, 18)
-                .padding(.vertical, 14)
+                .padding(.vertical, 12)
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.15), lineWidth: 0.7))
@@ -1771,14 +1951,14 @@ struct GalleryDarkroomView: View {
     
     @ViewBuilder
     private func darkroomSlider(title: String, value: Binding<Float>, range: ClosedRange<Float>, format: String, multiplier: Float = 1.0) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
                 Spacer()
                 Text(String(format: format, value.wrappedValue * multiplier))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(selectedProfile.badgeColor)
             }
             Slider(value: Binding(
@@ -1797,13 +1977,21 @@ struct GalleryDarkroomView: View {
             guard var ci = CIImage(data: originalData, options: [.applyOrientationProperty: true]) else { return }
             ci = ci.transformed(by: CGAffineTransform(translationX: -ci.extent.origin.x, y: -ci.extent.origin.y))
             let maxDim = max(ci.extent.width, ci.extent.height)
-            if maxDim > 1200 {
-                let scale = 1200.0 / maxDim
+            // Previsualización de alta resolución (2000px) para que el grano, halation y curvas se vean 1:1 con la foto final
+            if maxDim > 2000 {
+                let scale = 2000.0 / maxDim
                 ci = ci.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
             }
             let finalCI = ci
+            let origUI: UIImage?
+            if let cg = CinematicPipeline.shared.ciContext.createCGImage(finalCI, from: finalCI.extent) {
+                origUI = UIImage(cgImage: cg)
+            } else {
+                origUI = nil
+            }
             await MainActor.run {
                 self.scaledCIImage = finalCI
+                self.originalPreviewImage = origUI
                 self.updatePreview()
             }
         }
@@ -1818,6 +2006,10 @@ struct GalleryDarkroomView: View {
         let vig = vignetteAmount
         let warm = warmthAdjust
         let exp = exposureAdjust
+        let shd = shadowsAdjust
+        let hlt = highlightsAdjust
+        let fade = fadeMatteAmount
+        let sat = saturationAdjust
         let port = portraitDepthBlur
         let leak = lightLeakEnabled
         let stamp = dateStampEnabled
@@ -1834,6 +2026,10 @@ struct GalleryDarkroomView: View {
                 vignetteAmount: vig,
                 warmthAdjust: warm,
                 exposureAdjust: exp,
+                shadowsAdjust: shd,
+                highlightsAdjust: hlt,
+                fadeMatteAmount: fade,
+                saturationAdjust: sat,
                 portraitDepthBlur: port,
                 lightLeakEnabled: leak,
                 anamorphicMode: false
@@ -1863,6 +2059,10 @@ struct GalleryDarkroomView: View {
         let vig = vignetteAmount
         let warm = warmthAdjust
         let exp = exposureAdjust
+        let shd = shadowsAdjust
+        let hlt = highlightsAdjust
+        let fade = fadeMatteAmount
+        let sat = saturationAdjust
         let port = portraitDepthBlur
         let leak = lightLeakEnabled
         let stamp = dateStampEnabled
@@ -1874,7 +2074,7 @@ struct GalleryDarkroomView: View {
             let result = CinematicPipeline.shared.developFinalPhoto(
                 data: rawData,
                 rawMetadata: nil,
-                wasCapturedAsRAW: true,
+                wasCapturedAsRAW: false,
                 profile: prof,
                 contrastSCurve: sCurve,
                 bloomAmount: bloom,
@@ -1882,6 +2082,10 @@ struct GalleryDarkroomView: View {
                 vignetteAmount: vig,
                 warmthAdjust: warm,
                 exposureAdjust: exp,
+                shadowsAdjust: shd,
+                highlightsAdjust: hlt,
+                fadeMatteAmount: fade,
+                saturationAdjust: sat,
                 portraitDepthBlur: port,
                 nightModeBoost: prof == .nocturnaClub,
                 lightLeakEnabled: leak,
@@ -1912,23 +2116,43 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 7. Interfaz Principal oCam con Liquid Glass de Apple
+// MARK: - 7. Interfaz Principal oCam con Liquid Glass, Nivel Horizonte y Doble Exposición
 struct GridOverlayView: View {
+    let showHorizon: Bool
+    let horizonDegrees: Double
+    
     var body: some View {
         GeometryReader { geo in
-            Path { path in
-                let w = geo.size.width
-                let h = geo.size.height
-                path.move(to: CGPoint(x: w / 3, y: 0))
-                path.addLine(to: CGPoint(x: w / 3, y: h))
-                path.move(to: CGPoint(x: (w / 3) * 2, y: 0))
-                path.addLine(to: CGPoint(x: (w / 3) * 2, y: h))
-                path.move(to: CGPoint(x: 0, y: h / 3))
-                path.addLine(to: CGPoint(x: w, y: h / 3))
-                path.move(to: CGPoint(x: 0, y: (h / 3) * 2))
-                path.addLine(to: CGPoint(x: w, y: (h / 3) * 2))
+            let w = geo.size.width
+            let h = geo.size.height
+            let isLevel = abs(horizonDegrees) < 1.2
+            
+            ZStack {
+                Path { path in
+                    path.move(to: CGPoint(x: w / 3, y: 0))
+                    path.addLine(to: CGPoint(x: w / 3, y: h))
+                    path.move(to: CGPoint(x: (w / 3) * 2, y: 0))
+                    path.addLine(to: CGPoint(x: (w / 3) * 2, y: h))
+                    path.move(to: CGPoint(x: 0, y: h / 3))
+                    path.addLine(to: CGPoint(x: w, y: h / 3))
+                    path.move(to: CGPoint(x: 0, y: (h / 3) * 2))
+                    path.addLine(to: CGPoint(x: w, y: (h / 3) * 2))
+                }
+                .stroke(Color.white.opacity(0.18), lineWidth: 0.6)
+                
+                if showHorizon {
+                    ZStack {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.25))
+                            .frame(width: 110, height: 1)
+                        Rectangle()
+                            .fill(isLevel ? Color.yellow : Color.white.opacity(0.85))
+                            .frame(width: 64, height: isLevel ? 2.0 : 1.2)
+                            .rotationEffect(.degrees(horizonDegrees))
+                    }
+                    .position(x: w / 2, y: h / 2)
+                }
             }
-            .stroke(Color.white.opacity(0.20), lineWidth: 0.6)
         }
         .allowsHitTesting(false)
     }
@@ -1959,7 +2183,7 @@ struct ContentView: View {
             
             VStack(spacing: 10) {
                 // 1. Barra Superior Minimalista Liquid Glass
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Button {
                         camera.toggleSensorMode()
                     } label: {
@@ -1997,6 +2221,22 @@ struct ContentView: View {
                             .foregroundStyle(camera.portraitDepthBlur > 0.05 ? .black : .white.opacity(0.85))
                             .frame(width: 32, height: 32)
                             .background(camera.portraitDepthBlur > 0.05 ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                            .clipShape(Circle())
+                    }
+                    
+                    // Botón de Doble Exposición Analógica (2X EXP)
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        camera.doubleExposureEnabled.toggle()
+                        if !camera.doubleExposureEnabled {
+                            camera.doubleExposureFirstShot = nil
+                        }
+                    } label: {
+                        Image(systemName: "square.on.square.dashed")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(camera.doubleExposureEnabled ? .black : .white.opacity(0.85))
+                            .frame(width: 32, height: 32)
+                            .background(camera.doubleExposureEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
                             .clipShape(Circle())
                     }
                     
@@ -2050,14 +2290,14 @@ struct ContentView: View {
                             .clipShape(Circle())
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.6))
                 .padding(.horizontal, 14)
                 
-                // 2. Visor Principal con Previsualización Fiel (Desaturación orgánica + Densidad de sombras)
+                // 2. Visor Principal con Previsualización Fiel
                 GeometryReader { outerGeo in
                     let availW = outerGeo.size.width
                     let availH = outerGeo.size.height
@@ -2071,11 +2311,12 @@ struct ContentView: View {
                                 camera.focusAt(normalizedPoint: devicePt, viewPoint: viewPt)
                             }
                             .contrast(liveContrast(for: camera.selectedProfile) + Double(camera.contrastSCurve) * 0.12)
-                            .saturation(liveSaturation(for: camera.selectedProfile))
+                            .saturation(max(0.0, liveSaturation(for: camera.selectedProfile) + Double(camera.saturationAdjust) * 0.35))
                             
                             LiveOpticalEffectsView(
                                 profile: camera.selectedProfile,
                                 contrastSCurve: camera.contrastSCurve,
+                                fadeMatteAmount: camera.fadeMatteAmount,
                                 vignetteIntensity: camera.vignetteIntensity,
                                 grainIntensity: camera.grainIntensity,
                                 bloomIntensity: camera.bloomIntensity,
@@ -2084,11 +2325,15 @@ struct ContentView: View {
                                 lightLeakEnabled: camera.lightLeakEnabled,
                                 anamorphicMode: camera.anamorphicMode,
                                 dateStampEnabled: camera.dateStampEnabled,
-                                frameStyle: camera.frameStyle
+                                frameStyle: camera.frameStyle,
+                                doubleExposureGhost: camera.doubleExposureFirstShot
                             )
                             
                             if camera.showGrid {
-                                GridOverlayView()
+                                GridOverlayView(
+                                    showHorizon: camera.showHorizonAndHistogram,
+                                    horizonDegrees: camera.horizonAngleDegrees
+                                )
                             }
                             
                             if let pt = camera.focusPoint {
@@ -2154,9 +2399,9 @@ struct ContentView: View {
                             if showTray {
                                 VStack(spacing: 10) {
                                     HStack(spacing: 8) {
-                                        trayTabPill(index: 0, title: "Tone & EV")
+                                        trayTabPill(index: 0, title: "Tone & Fade")
                                         trayTabPill(index: 1, title: "Film & Grain")
-                                        trayTabPill(index: 2, title: "Ratio & Retro")
+                                        trayTabPill(index: 2, title: "Ratio & HUD")
                                         
                                         Spacer()
                                         
@@ -2189,7 +2434,9 @@ struct ContentView: View {
                                             set: { camera.setExposure($0) }
                                         ), range: -2.0...1.5, text: String(format: "%+.1f EV", camera.exposureEV))
                                         
-                                        glassSliderRow(title: "ROLL-OFF", value: $camera.contrastSCurve, range: 0.0...1.0, text: String(format: "%.2f", camera.contrastSCurve * 4.0))
+                                        glassSliderRow(title: "S-CURVE", value: $camera.contrastSCurve, range: 0.0...1.0, text: String(format: "%.2f", camera.contrastSCurve * 4.0))
+                                        
+                                        glassSliderRow(title: "MATTE FADE", value: $camera.fadeMatteAmount, range: 0.0...1.0, text: "\(Int(camera.fadeMatteAmount * 100))%")
                                         
                                         glassSliderRow(title: "TEMP (WB)", value: $camera.warmth, range: -1.0...1.0, text: String(format: "%+.1f", camera.warmth))
                                     } else if activeDrawerTab == 1 {
@@ -2257,13 +2504,13 @@ struct ContentView: View {
                                             }
                                             
                                             Button {
-                                                camera.showGrid.toggle()
+                                                camera.showHorizonAndHistogram.toggle()
                                             } label: {
-                                                Image(systemName: "squareshape.split.3x3")
+                                                Image(systemName: "level")
                                                     .font(.system(size: 12))
-                                                    .foregroundStyle(camera.showGrid ? .black : .white)
+                                                    .foregroundStyle(camera.showHorizonAndHistogram ? .black : .white)
                                                     .padding(6)
-                                                    .background(camera.showGrid ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                    .background(camera.showHorizonAndHistogram ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
                                                     .clipShape(Circle())
                                             }
                                         }
@@ -2302,7 +2549,7 @@ struct ContentView: View {
                     .frame(width: availW, height: availH)
                 }
                 
-                // 3. Selector de Cámaras en Cápsulas Liquid Glass
+                // 3. Selector de las 16 Cámaras en Cápsulas Liquid Glass
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(FilmProfile.allCases) { profile in
@@ -2501,17 +2748,18 @@ struct ContentView: View {
     private func liveContrast(for profile: FilmProfile) -> Double {
         switch profile {
         case .triX400, .bleachBypass: return 1.20
-        case .ocamMaster, .nocturnaClub: return 1.08
-        case .polaroid600: return 0.96
+        case .ocamMaster, .cineChrome, .kodak2383, .nocturnaClub: return 1.08
+        case .polaroid600, .ilfordHP5: return 0.96
         default: return 1.06
         }
     }
     
     private func liveSaturation(for profile: FilmProfile) -> Double {
         switch profile {
-        case .triX400: return 0.0
+        case .triX400, .ilfordHP5: return 0.0
         case .bleachBypass: return 0.45
         case .velvia50: return 1.12
+        case .cineChrome: return 0.83
         case .ocamMaster, .polaroid600: return 0.88
         default: return 0.94
         }
