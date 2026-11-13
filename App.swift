@@ -99,7 +99,7 @@ enum FilmProfile: String, CaseIterable, Identifiable {
         case .ocamMaster:
             return RecommendedSettings(ev: -0.35, contrastSCurve: 0.65, warmth: 0.0, bloom: 0.30, grain: 0.24, vignette: 0.20, fadeMatte: 0.14, saturationAdjust: -0.10, nightMode: false)
         case .cineChrome:
-            // AJUSTE PEDIDO: Palms 70s por defecto con Viñeta en 0.0 (0%) y Halation al máximo (1.0 / 100%)
+            // Palms 70s por defecto con Viñeta en 0% (0.0) y Halation al máximo (100% / 1.0)
             return RecommendedSettings(ev: -0.40, contrastSCurve: 0.74, warmth: 0.06, bloom: 1.00, grain: 0.30, vignette: 0.00, fadeMatte: 0.22, saturationAdjust: -0.16, nightMode: false)
         case .kodak2383:
             return RecommendedSettings(ev: -0.40, contrastSCurve: 0.78, warmth: 0.0, bloom: 0.34, grain: 0.26, vignette: 0.28, fadeMatte: 0.18, saturationAdjust: -0.08, nightMode: false)
@@ -215,7 +215,7 @@ class CinematicPipeline {
             if let out = exp.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 1. Corrección de Exceso de Verde exclusiva para Bayer RAW + Reducción extra de ruido en sombras oscuras
+        // 1. Corrección de Exceso de Verde y Reducción de Ruido para Bayer RAW en poca luz
         if isRAW {
             let rawGreenFix = CIFilter.colorMatrix()
             rawGreenFix.inputImage = current
@@ -226,7 +226,7 @@ class CinematicPipeline {
             
             let nr = CIFilter.noiseReduction()
             nr.inputImage = current
-            nr.noiseLevel = 0.045
+            nr.noiseLevel = 0.05
             nr.sharpness = 0.35
             if let out = nr.outputImage?.cropped(to: extent) { current = out }
         }
@@ -435,7 +435,7 @@ class CinematicPipeline {
             }
         }
         
-        // 7. Halation / Difusión en luces (Calibrado para brillar al máximo en Palms 70s)
+        // 7. Halation / Difusión en luces
         if bloomAmount > 0.04 {
             let bloom = CIFilter.bloom()
             bloom.inputImage = current.clampedToExtent()
@@ -735,13 +735,10 @@ class CinematicPipeline {
         default: targetExifOrientation = .right
         }
         
-        // Limpieza máxima de ruido de crominancia/luminancia en Bayer RAW para evitar el granulado en interiores con poca luz
+        // Limpieza de ruido en Bayer RAW usando las propiedades 100% compatibles con el SDK de iOS 18.5
         if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
-            rawFilter.luminanceNoiseReductionAmount = 0.92
+            rawFilter.luminanceNoiseReductionAmount = 0.94
             rawFilter.colorNoiseReductionAmount = 1.00
-            rawFilter.noiseReductionSharpnessAmount = 0.45
-            rawFilter.noiseReductionContrastAmount = 0.35
-            rawFilter.noiseReductionDetailAmount = 0.65
             rawFilter.moireAmount = 0.80
             rawFilter.sharpnessAmount = 0.20
             rawFilter.localToneMapAmount = 0.0
@@ -855,7 +852,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var statusMessage = "48MP PRO"
     var lastExifSummary = "1/125s | f/1.6 | ISO 64"
     var currentZoom: CGFloat = 1.0
-    var selectedProfile: FilmProfile = .cineChrome // Arranca en Palms 70s con viñeta 0 y halation al máximo
+    var selectedProfile: FilmProfile = .cineChrome // Palms 70s por defecto (Viñeta 0, Halation 100%)
     
     var exposureEV: Float = -0.40
     var contrastSCurve: Float = 0.74
@@ -1538,7 +1535,6 @@ struct LiveOpticalEffectsView: View {
                     .position(x: geo.size.width / 2, y: geo.size.height * 0.42)
                 }
                 
-                // Solo dibuja viñeta si vignetteIntensity > 0.01 (en Palms 70s por defecto es 0.0)
                 if vignetteIntensity > 0.01 {
                     RadialGradient(
                         colors: [
@@ -1941,6 +1937,8 @@ struct GalleryDarkroomView: View {
                     .font(.system(size: 16, weight: .semibold))
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .foregroundStyle(activeTab == index ? selectedProfile.badgeColor : .white.opacity(0.6))
             .frame(maxWidth: .infinity)
@@ -2116,7 +2114,7 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 7. Interfaz Principal oCam (Barra Superior Sin Textos Verticales + Márgenes Laterales en el Visor)
+// MARK: - 7. Interfaz Principal oCam (Con Menú Desplegable Nativo de iOS y Pestañas en 1 Línea)
 struct GridOverlayView: View {
     let showHorizon: Bool
     let horizonDegrees: Double
@@ -2171,10 +2169,14 @@ struct ContentView: View {
     private let zoomLevels: [CGFloat] = [0.5, 1.0, 2.0, 3.0]
     
     private var modeButtonTitle: String {
-        if camera.currentZoom != 1.0 && camera.currentZoom != 2.0 && camera.currentZoom != 3.0 { return "12MP" }
-        if camera.use48MPMode && camera.is48MPSupported && camera.currentZoom == 1.0 { return "48MP" }
-        if camera.useRAWCapture && camera.currentZoom == 1.0 { return "RAW" }
+        if camera.currentZoom != 1.0 { return "12MP" }
+        if camera.use48MPMode && camera.is48MPSupported { return "48MP" }
+        if camera.useRAWCapture { return "RAW" }
         return "12MP"
+    }
+    
+    private var hasExtraFeaturesActive: Bool {
+        camera.timerSeconds > 0 || camera.nightModeEnabled || camera.portraitDepthBlur > 0.05 || camera.doubleExposureEnabled || camera.dateStampEnabled || camera.lightLeakEnabled
     }
     
     var body: some View {
@@ -2182,13 +2184,14 @@ struct ContentView: View {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 12) {
-                // 1. Barra Superior Liquid Glass (Con fixedSize para que NUNCA se pongan en vertical 48MP ni oCam)
+                // 1. Barra Superior Minimalista (Amplia, con Menú Desplegable Nativo de iOS para Funciones Extra)
                 HStack(spacing: 10) {
+                    // Botón 48MP / RAW / 12MP (Siempre en 1 sola línea horizontal)
                     Button {
                         camera.toggleSensorMode()
                     } label: {
                         Text(modeButtonTitle)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .padding(.horizontal, 12)
@@ -2198,46 +2201,45 @@ struct ContentView: View {
                             .clipShape(Capsule())
                     }
                     
+                    // Botón Flash
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        camera.nightModeEnabled.toggle()
-                        camera.updateNightModeHardware()
+                        camera.flashEnabled.toggle()
                     } label: {
-                        Image(systemName: camera.nightModeEnabled ? "moon.stars.fill" : "moon")
+                        Image(systemName: camera.flashEnabled ? "bolt.fill" : "bolt.slash")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(camera.nightModeEnabled ? .black : .white.opacity(0.85))
-                            .frame(width: 32, height: 32)
-                            .background(camera.nightModeEnabled ? Color.yellow : Color.white.opacity(0.12))
+                            .foregroundStyle(camera.flashEnabled ? .yellow : .white.opacity(0.85))
+                            .frame(width: 34, height: 34)
+                            .background(Color.white.opacity(0.12))
                             .clipShape(Circle())
                     }
                     
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            camera.portraitDepthBlur = (camera.portraitDepthBlur > 0.05) ? 0.0 : 0.65
-                        }
-                    } label: {
-                        Text("f")
-                            .font(.system(size: 14, weight: .bold, design: .serif))
-                            .italic()
+                    Spacer()
+                    
+                    // Título central oCam con indicador de Temporizador si está activo
+                    HStack(spacing: 6) {
+                        Text("oCam")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
-                            .foregroundStyle(camera.portraitDepthBlur > 0.05 ? .black : .white.opacity(0.85))
-                            .frame(width: 32, height: 32)
-                            .background(camera.portraitDepthBlur > 0.05 ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                            .clipShape(Circle())
+                            .foregroundStyle(.white.opacity(0.95))
+                        
+                        if camera.timerSeconds > 0 {
+                            Text("\(camera.timerSeconds)s")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.yellow)
+                                .clipShape(Capsule())
+                        }
                     }
                     
-                    Spacer(minLength: 4)
+                    Spacer()
                     
-                    Text("oCam")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .foregroundStyle(.white.opacity(0.95))
-                    
-                    Spacer(minLength: 4)
-                    
+                    // Botón de Exposición Directa (+/- EV)
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -2247,24 +2249,95 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "plusminus.circle")
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(showExposureBar || abs(camera.exposureEV + 0.40) > 0.05 ? camera.selectedProfile.badgeColor : .white.opacity(0.85))
-                            .frame(width: 32, height: 32)
+                            .foregroundStyle(showExposureBar ? camera.selectedProfile.badgeColor : .white.opacity(0.85))
+                            .frame(width: 34, height: 34)
                             .background(Color.white.opacity(0.12))
                             .clipShape(Circle())
                     }
                     
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        camera.flashEnabled.toggle()
+                    // MENÚ DESPLEGABLE NATIVO DE iOS (Agrupa Temporizador, Noche, Retrato, 2X Exp, Fecha '98 y Extras sin saturar la pantalla)
+                    Menu {
+                        Section("Temporizador de Disparo") {
+                            Button {
+                                camera.timerSeconds = 0
+                            } label: {
+                                Label("Desactivado", systemImage: camera.timerSeconds == 0 ? "checkmark" : "timer")
+                            }
+                            Button {
+                                camera.timerSeconds = 3
+                            } label: {
+                                Label("3 Segundos", systemImage: camera.timerSeconds == 3 ? "checkmark" : "timer")
+                            }
+                            Button {
+                                camera.timerSeconds = 10
+                            } label: {
+                                Label("10 Segundos", systemImage: camera.timerSeconds == 10 ? "checkmark" : "timer")
+                            }
+                        }
+                        
+                        Section("Modos de Cámara") {
+                            Button {
+                                camera.nightModeEnabled.toggle()
+                                camera.updateNightModeHardware()
+                            } label: {
+                                Label(camera.nightModeEnabled ? "Modo Noche: Activo" : "Modo Noche", systemImage: "moon.stars.fill")
+                            }
+                            
+                            Button {
+                                camera.portraitDepthBlur = (camera.portraitDepthBlur > 0.05) ? 0.0 : 0.65
+                            } label: {
+                                Label(camera.portraitDepthBlur > 0.05 ? "Modo Retrato (f/1.4): Activo" : "Modo Retrato (f/1.4)", systemImage: "camera.aperture")
+                            }
+                            
+                            Button {
+                                camera.doubleExposureEnabled.toggle()
+                                if !camera.doubleExposureEnabled { camera.doubleExposureFirstShot = nil }
+                            } label: {
+                                Label(camera.doubleExposureEnabled ? "Doble Exposición (2X): Activo" : "Doble Exposición (2X)", systemImage: "square.on.square.dashed")
+                            }
+                            
+                            Button {
+                                camera.anamorphicMode.toggle()
+                            } label: {
+                                Label(camera.anamorphicMode ? "Destello Anamórfico: Activo" : "Destello Anamórfico", systemImage: "sparkles.tv")
+                            }
+                        }
+                        
+                        Section("Óptica Retro y Visor") {
+                            Button {
+                                camera.dateStampEnabled.toggle()
+                            } label: {
+                                Label(camera.dateStampEnabled ? "Fechador '98: Activo" : "Fechador '98", systemImage: "calendar")
+                            }
+                            
+                            Button {
+                                camera.lightLeakEnabled.toggle()
+                            } label: {
+                                Label(camera.lightLeakEnabled ? "Light Leak: Activo" : "Light Leak Analógico", systemImage: "sun.max.trianglebadge.exclamationmark")
+                            }
+                            
+                            Button {
+                                camera.showGrid.toggle()
+                            } label: {
+                                Label(camera.showGrid ? "Cuadrícula: Visible" : "Mostrar Cuadrícula", systemImage: "squareshape.split.3x3")
+                            }
+                            
+                            Button {
+                                camera.showHorizonAndHistogram.toggle()
+                            } label: {
+                                Label(camera.showHorizonAndHistogram ? "Nivel Horizonte: Visible" : "Mostrar Nivel Horizonte", systemImage: "level")
+                            }
+                        }
                     } label: {
-                        Image(systemName: camera.flashEnabled ? "bolt.fill" : "bolt.slash")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(camera.flashEnabled ? .yellow : .white.opacity(0.8))
-                            .frame(width: 32, height: 32)
-                            .background(Color.white.opacity(0.12))
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(hasExtraFeaturesActive ? .black : .white)
+                            .frame(width: 34, height: 34)
+                            .background(hasExtraFeaturesActive ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
                             .clipShape(Circle())
                     }
                     
+                    // Botón Chevron para desplegar los Sliders de Cine
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
@@ -2275,7 +2348,7 @@ struct ContentView: View {
                         Image(systemName: showTray ? "chevron.down" : "chevron.up")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(showTray ? .black : .white)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 34, height: 34)
                             .background(showTray ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
                             .clipShape(Circle())
                     }
@@ -2287,10 +2360,10 @@ struct ContentView: View {
                 .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 0.6))
                 .padding(.horizontal, 16)
                 
-                // 2. Visor Principal Enmarcado con Márgenes Laterales Elegantes (No llega hasta el borde de la pantalla)
+                // 2. Visor Principal con Márgenes Laterales Elegantes (No llega hasta el borde de la pantalla)
                 GeometryReader { outerGeo in
-                    let sidePadding: CGFloat = 32.0 // 16pt de margen negro limpio a cada lado del visor
-                    let availW = max(100, outerGeo.size.width - sidePadding)
+                    let sideMargin: CGFloat = 36.0 // 18pt de margen negro limpio a cada lado del visor
+                    let availW = max(100, outerGeo.size.width - sideMargin)
                     let availH = max(100, outerGeo.size.height - 6)
                     let targetRatio = camera.aspectRatio.portraitRatio
                     let frameW = min(availW, availH * targetRatio)
@@ -2327,7 +2400,6 @@ struct ContentView: View {
                                 )
                             }
                             
-                            // Cuadro de Enfoque + Sol de Exposición Rápida al tocar
                             if let pt = camera.focusPoint {
                                 HStack(spacing: 8) {
                                     RoundedRectangle(cornerRadius: 6)
@@ -2359,7 +2431,7 @@ struct ContentView: View {
                         
                         // Controles Flotantes dentro del Visor
                         VStack {
-                            HStack {
+                            HStack(spacing: 6) {
                                 Text("\(camera.selectedProfile.rawValue) • \(camera.statusMessage)")
                                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                                     .lineLimit(1)
@@ -2400,14 +2472,15 @@ struct ContentView: View {
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                             
+                            // Bandeja de Ajustes con Pestañas Cortas en 1 Sola Línea (Tone | Grain | Format)
                             if showTray {
                                 VStack(spacing: 10) {
-                                    HStack(spacing: 8) {
-                                        trayTabPill(index: 0, title: "Tone & Fade")
-                                        trayTabPill(index: 1, title: "Film & Grain")
-                                        trayTabPill(index: 2, title: "Ratio & Extras")
+                                    HStack(spacing: 6) {
+                                        trayTabPill(index: 0, title: "Tone")
+                                        trayTabPill(index: 1, title: "Grain")
+                                        trayTabPill(index: 2, title: "Format")
                                         
-                                        Spacer()
+                                        Spacer(minLength: 4)
                                         
                                         Menu {
                                             Button("Recomendado para \(camera.selectedProfile.rawValue)", systemImage: "sparkles") {
@@ -2427,8 +2500,8 @@ struct ContentView: View {
                                             }
                                             .font(.system(size: 10, weight: .bold))
                                             .foregroundStyle(.black)
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 5)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
                                             .background(camera.selectedProfile.badgeColor)
                                             .clipShape(Capsule())
                                         }
@@ -2460,6 +2533,8 @@ struct ContentView: View {
                                                 } label: {
                                                     Text(ratio.rawValue)
                                                         .font(.system(size: 11, weight: .bold, design: .rounded))
+                                                        .lineLimit(1)
+                                                        .fixedSize(horizontal: true, vertical: false)
                                                         .foregroundStyle(camera.aspectRatio == ratio ? .black : .white)
                                                         .frame(maxWidth: .infinity)
                                                         .padding(.vertical, 6)
@@ -2469,71 +2544,21 @@ struct ContentView: View {
                                             }
                                         }
                                         
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: 6) {
+                                        HStack(spacing: 6) {
+                                            ForEach(FrameStyleOption.allCases, id: \.self) { style in
                                                 Button {
-                                                    camera.doubleExposureEnabled.toggle()
-                                                    if !camera.doubleExposureEnabled {
-                                                        camera.doubleExposureFirstShot = nil
-                                                    }
+                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                    camera.frameStyle = style
                                                 } label: {
-                                                    Text(camera.doubleExposureEnabled ? "2X EXP: ON" : "2X EXP")
-                                                        .font(.system(size: 10, weight: .semibold))
-                                                        .foregroundStyle(camera.doubleExposureEnabled ? .black : .white)
-                                                        .padding(.horizontal, 10)
+                                                    Text(style.rawValue)
+                                                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                                        .lineLimit(1)
+                                                        .fixedSize(horizontal: true, vertical: false)
+                                                        .foregroundStyle(camera.frameStyle == style ? .black : .white)
+                                                        .frame(maxWidth: .infinity)
                                                         .padding(.vertical, 6)
-                                                        .background(camera.doubleExposureEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                                        .background(camera.frameStyle == style ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
                                                         .clipShape(Capsule())
-                                                }
-                                                
-                                                Button {
-                                                    camera.dateStampEnabled.toggle()
-                                                } label: {
-                                                    Text(camera.dateStampEnabled ? "FECHA '98: ON" : "FECHA '98")
-                                                        .font(.system(size: 10, weight: .semibold))
-                                                        .foregroundStyle(camera.dateStampEnabled ? .black : .white)
-                                                        .padding(.horizontal, 10)
-                                                        .padding(.vertical, 6)
-                                                        .background(camera.dateStampEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                                        .clipShape(Capsule())
-                                                }
-                                                
-                                                Button {
-                                                    camera.lightLeakEnabled.toggle()
-                                                } label: {
-                                                    Text(camera.lightLeakEnabled ? "LEAK: ON" : "LIGHT LEAK")
-                                                        .font(.system(size: 10, weight: .semibold))
-                                                        .foregroundStyle(camera.lightLeakEnabled ? .black : .white)
-                                                        .padding(.horizontal, 10)
-                                                        .padding(.vertical, 6)
-                                                        .background(camera.lightLeakEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                                        .clipShape(Capsule())
-                                                }
-                                                
-                                                Button {
-                                                    let all = FrameStyleOption.allCases
-                                                    if let idx = all.firstIndex(of: camera.frameStyle) {
-                                                        camera.frameStyle = all[(idx + 1) % all.count]
-                                                    }
-                                                } label: {
-                                                    Text(camera.frameStyle.rawValue)
-                                                        .font(.system(size: 10, weight: .semibold))
-                                                        .foregroundStyle(camera.frameStyle != .none ? .black : .white)
-                                                        .padding(.horizontal, 10)
-                                                        .padding(.vertical, 6)
-                                                        .background(camera.frameStyle != .none ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                                        .clipShape(Capsule())
-                                                }
-                                                
-                                                Button {
-                                                    camera.showHorizonAndHistogram.toggle()
-                                                } label: {
-                                                    Image(systemName: "level")
-                                                        .font(.system(size: 12))
-                                                        .foregroundStyle(camera.showHorizonAndHistogram ? .black : .white)
-                                                        .padding(6)
-                                                        .background(camera.showHorizonAndHistogram ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                                        .clipShape(Circle())
                                                 }
                                             }
                                         }
@@ -2544,7 +2569,7 @@ struct ContentView: View {
                                 .background(.ultraThinMaterial)
                                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.18), lineWidth: 0.7))
-                                .padding(.horizontal, 24)
+                                .padding(.horizontal, 26)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                             
@@ -2662,6 +2687,7 @@ struct ContentView: View {
                             Text("STUDIO")
                                 .font(.system(size: 8, weight: .bold, design: .rounded))
                                 .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundStyle(.white)
                         .frame(width: 52, height: 52)
@@ -2749,12 +2775,12 @@ struct ContentView: View {
             }
         } label: {
             Text(title)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(activeDrawerTab == index ? .black : .white.opacity(0.8))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .foregroundStyle(activeDrawerTab == index ? .black : .white.opacity(0.85))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
                 .background(activeDrawerTab == index ? Color.white : Color.white.opacity(0.12))
                 .clipShape(Capsule())
         }
@@ -2766,6 +2792,7 @@ struct ContentView: View {
             Text(title)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(.white.opacity(0.85))
                 .frame(width: 72, alignment: .leading)
             Slider(value: value, in: range)
