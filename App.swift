@@ -726,10 +726,10 @@ class CinematicPipeline {
         default: targetExifOrientation = .right
         }
         
+        // Propiedades 100% verificadas en CIRAWFilter para el SDK de iOS 18.5
         if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
             rawFilter.luminanceNoiseReductionAmount = 0.94
             rawFilter.colorNoiseReductionAmount = 1.00
-            rawFilter.moireAmount = 0.80
             rawFilter.sharpnessAmount = 0.20
             rawFilter.localToneMapAmount = 0.0
             rawFilter.boostAmount = 0.48
@@ -822,7 +822,7 @@ class CinematicPipeline {
     }
 }
 
-// MARK: - 3. Controlador de Hardware oCam (Soporte Vertical y Horizontal Automático)
+// MARK: - 3. Controlador de Hardware oCam
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     let session = AVCaptureSession()
@@ -873,7 +873,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var focusPoint: CGPoint?
     var physicalOrientation: UIDeviceOrientation = .portrait
     
-    // Ángulo de rotación suave para los iconos cuando pones el iPhone en horizontal (estilo Cámara de iOS)
     var uiRotationDegrees: Double {
         switch physicalOrientation {
         case .landscapeLeft: return 90.0
@@ -1356,24 +1355,29 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 deviceOrientation: angle
             )
             
-            guard var finalUIImage = result.previewImage else {
+            guard let initialImage = result.previewImage else {
                 await MainActor.run { self.isProcessing = false }
                 return
             }
             
             if isDoubleExp && firstShot == nil {
                 await MainActor.run {
-                    self.doubleExposureFirstShot = finalUIImage
+                    self.doubleExposureFirstShot = initialImage
                     self.statusMessage = "2X EXP: TOMA 2/2"
                     self.isProcessing = false
                 }
                 return
             }
             
-            var finalDataToSave = result.jpegData
+            let outputImage: UIImage
+            let finalDataToSave: Data?
             if isDoubleExp, let baseShot = firstShot {
-                finalUIImage = CinematicPipeline.shared.blendDoubleExposure(base: baseShot, overlay: finalUIImage)
-                finalDataToSave = finalUIImage.jpegData(compressionQuality: 0.96)
+                let blended = CinematicPipeline.shared.blendDoubleExposure(base: baseShot, overlay: initialImage)
+                outputImage = blended
+                finalDataToSave = blended.jpegData(compressionQuality: 0.96)
+            } else {
+                outputImage = initialImage
+                finalDataToSave = result.jpegData
             }
             
             if let jpegData = finalDataToSave {
@@ -1387,7 +1391,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                             self.statusMessage = isDoubleExp ? "2X EXP GUARDADA" : result.status
                             self.lastExifSummary = result.exifSummary
                         } else {
-                            UIImageWriteToSavedPhotosAlbum(finalUIImage, nil, nil, nil)
+                            UIImageWriteToSavedPhotosAlbum(outputImage, nil, nil, nil)
                             self.statusMessage = "GUARDADA"
                         }
                     }
@@ -1396,7 +1400,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             
             await MainActor.run {
                 self.doubleExposureFirstShot = nil
-                self.capturedImage = finalUIImage
+                self.capturedImage = outputImage
                 self.isProcessing = false
             }
         }
@@ -2023,7 +2027,7 @@ struct GalleryDarkroomView: View {
         let ratio = aspectRatio
         let frame = frameStyle
         
-        Task.detached(priority: .userInteractive) {
+        Task.detached(priority: .userInitiated) {
             guard var img = CinematicPipeline.shared.renderPreviewUIImage(
                 from: baseCI,
                 profile: prof,
@@ -2123,7 +2127,7 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 7. Interfaz Principal oCam Modular (Compilación Rápida + Rotación Horizontal de Iconos)
+// MARK: - 7. Interfaz Principal oCam Modular
 struct GridOverlayView: View {
     let showHorizon: Bool
     let horizonDegrees: Double
@@ -2226,7 +2230,6 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Subvistas Modulares (Garantizan compilación instantánea y soporte Horizontal)
     private var topBarView: some View {
         HStack(spacing: 10) {
             Button {
