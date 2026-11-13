@@ -26,3 +26,5 @@ targets:
         NSPhotoLibraryUsageDescription: "Importar y revelar fotos en el laboratorio de oCam."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
