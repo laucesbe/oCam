@@ -19,37 +19,37 @@ struct oCamApp: App {
     }
 }
 
-// MARK: - 1. Los 22 Parámetros del Motor Cinematográfico de oCam
+// MARK: - 1. Parámetros del Motor Cinematográfico de oCam (Sombras Profundas + Altas Luces Brillantes)
 struct FilmLookParameters {
-    var ev: Float = -0.25               // Exposición real aplicada tanto en cámara como en Studio
-    var filmDensity: Float = 0.45       // NUEVO: Densidad Gamma en medios tonos (quita el aspecto blanco/brillante lavado)
+    var ev: Float = 0.0                 // 0.0 en Studio para NUNCA oscurecer la foto globalmente
+    var cameraBiasEV: Float = -0.20     // Compensación de sensor solo al disparar con la cámara en vivo
+    var shadowDepth: Float = 0.55       // Oscurece SOLO las sombras bajas y medios-bajos (palmeras/troncos)
+    var highlightBrilliance: Float = 0.50 // Mantiene el cielo y las casas luminosas y brillantes
     var contrastSCurve: Float = 0.65
-    var curvePivot: Float = 0.64
-    var skyCompression: Float = 0.45    // Comprime el blanco del cielo a crema suave para que no encandile
+    var curvePivot: Float = 0.52
     var shadows: Float = 0.0
-    var highlights: Float = 0.35
-    var blackCrush: Float = 0.32
-    var fadeMatte: Float = 0.12
+    var highlights: Float = 0.0         // 0.0 = No aplastar jamás el blanco de las nubes
+    var fadeMatte: Float = 0.08
     var warmth: Float = 0.0
     var tint: Float = 0.0
     var saturation: Float = -0.15
     var vibrance: Float = -0.15
-    var foliageHue: Float = 0.0         // Lleva el verde hacia pino profundo u oliva
-    var foliageDensity: Float = 0.35    // Oscurece la luminancia de las hojas verdes y el césped
+    var foliageHue: Float = 0.0
+    var foliageDensity: Float = 0.30    // Densidad selectiva solo donde el verde domina sobre rojo/azul
     var skyHue: Float = 0.0
-    var splitHighWarmth: Float = 0.40   // Tinte crema/marfil en el cielo y altas luces
-    var splitShadowTint: Float = 0.0    // Negativo = sombras frías/Teal, Positivo = sombras cálidas/tostadas (70s)
+    var splitHighWarmth: Float = 0.45   // Crema cálido aditivo en nubes/altas luces
+    var splitShadowTint: Float = 0.0
     var redTrim: Float = 0.0
     var greenTrim: Float = 0.0
     var blueTrim: Float = 0.0
     var softMist: Float = 0.25
     var bloom: Float = 0.35
-    var grain: Float = 0.26
-    var vignette: Float = 0.15
+    var grain: Float = 0.25
+    var vignette: Float = 0.12
     var nightMode: Bool = false
 }
 
-// MARK: - 2. Catálogo de 17 Cámaras con Personalidades Fuertes y Distintivas
+// MARK: - 2. Catálogo de 17 Cámaras Calibradas (Luminosas Arriba + Ricas en Sombras)
 enum FilmProfile: String, CaseIterable, Identifiable {
     case ocamMaster = "oCam"
     case normalClean = "Normal"
@@ -75,14 +75,14 @@ enum FilmProfile: String, CaseIterable, Identifiable {
         switch self {
         case .ocamMaster: return "BALANCED CINEMA MASTER"
         case .normalClean: return "NO FILTER • PURE SENSOR"
-        case .cineChrome: return "DENSE 70s PALMS & WARM CREAM"
+        case .cineChrome: return "BRIGHT CREAM SKY & DEEP SHADOWS"
         case .kodak2383: return "HOLLYWOOD TEAL & GOLD PRINT"
         case .nocturnaClub: return "NEON & DEEP NIGHT CLUB"
-        case .portra400: return "GOLDEN SKIN & PASTEL ROLL-OFF"
+        case .portra400: return "GOLDEN SKIN & BRIGHT ROLL-OFF"
         case .cinestill800T: return "TUNGSTEN CYAN & RED HALO"
         case .dispo98: return "90s GREEN FLASH SHADOWS"
         case .ccd2004: return "Y2K PUNCHY DIGICAM"
-        case .polaroid600: return "WARM FADED INSTANT FILM"
+        case .polaroid600: return "WARM CREAM INSTANT FILM"
         case .superia400: return "FUJI EMERALD & MAGENTA"
         case .velvia50: return "ULTRA VIVID SLIDE CHROME"
         case .gold200: return "CALIFORNIA SUNSET AMBER"
@@ -97,7 +97,7 @@ enum FilmProfile: String, CaseIterable, Identifiable {
         switch self {
         case .ocamMaster: return Color(red: 0.92, green: 0.84, blue: 0.70)
         case .normalClean: return Color.white
-        case .cineChrome: return Color(red: 0.94, green: 0.76, blue: 0.46)
+        case .cineChrome: return Color(red: 0.95, green: 0.78, blue: 0.48)
         case .kodak2383: return Color(red: 0.44, green: 0.82, blue: 0.88)
         case .nocturnaClub: return Color(red: 0.98, green: 0.48, blue: 0.36)
         case .portra400: return Color(red: 0.95, green: 0.68, blue: 0.48)
@@ -118,20 +118,19 @@ enum FilmProfile: String, CaseIterable, Identifiable {
     var recommended: FilmLookParameters {
         switch self {
         case .ocamMaster:
-            // Look cinematográfico equilibrado con densidad real y blancos sedosos
             return FilmLookParameters(
-                ev: -0.28, filmDensity: 0.42, contrastSCurve: 0.68, curvePivot: 0.64, skyCompression: 0.40,
-                shadows: -0.08, highlights: 0.35, blackCrush: 0.30, fadeMatte: 0.12,
-                warmth: 0.08, tint: 0.0, saturation: -0.14, vibrance: -0.16,
-                foliageHue: -0.20, foliageDensity: 0.38, skyHue: -0.15,
+                ev: 0.0, cameraBiasEV: -0.20, shadowDepth: 0.45, highlightBrilliance: 0.45,
+                contrastSCurve: 0.62, curvePivot: 0.52, shadows: 0.0, highlights: 0.0, fadeMatte: 0.08,
+                warmth: 0.08, tint: 0.0, saturation: -0.14, vibrance: -0.14,
+                foliageHue: -0.18, foliageDensity: 0.25, skyHue: -0.12,
                 splitHighWarmth: 0.38, splitShadowTint: 0.05,
-                redTrim: 0.03, greenTrim: -0.02, blueTrim: -0.05,
-                softMist: 0.20, bloom: 0.35, grain: 0.24, vignette: 0.18, nightMode: false
+                redTrim: 0.02, greenTrim: 0.0, blueTrim: -0.04,
+                softMist: 0.20, bloom: 0.35, grain: 0.22, vignette: 0.14, nightMode: false
             )
         case .normalClean:
             return FilmLookParameters(
-                ev: 0.0, filmDensity: 0.0, contrastSCurve: 0.0, curvePivot: 0.50, skyCompression: 0.0,
-                shadows: 0.0, highlights: 0.0, blackCrush: 0.0, fadeMatte: 0.0,
+                ev: 0.0, cameraBiasEV: 0.0, shadowDepth: 0.0, highlightBrilliance: 0.0,
+                contrastSCurve: 0.0, curvePivot: 0.50, shadows: 0.0, highlights: 0.0, fadeMatte: 0.0,
                 warmth: 0.0, tint: 0.0, saturation: 0.0, vibrance: 0.0,
                 foliageHue: 0.0, foliageDensity: 0.0, skyHue: 0.0,
                 splitHighWarmth: 0.0, splitShadowTint: 0.0,
@@ -139,171 +138,159 @@ enum FilmProfile: String, CaseIterable, Identifiable {
                 softMist: 0.0, bloom: 0.0, grain: 0.0, vignette: 0.0, nightMode: false
             )
         case .cineChrome:
-            // CLON EXACTO DE image_c5aa7d.jpg (Palms 70s):
-            // - Nada de blanco lavada: filmDensity = 0.68 y ev = -0.36 bajan la luminancia general dándole el peso rico de película
-            // - Cielo crema cálido comprimido (skyCompression: 0.62, splitHighWarmth: 0.65)
-            // - Palmeras densas en silueta verde pino oscuro (foliageDensity: 0.72, blackCrush: 0.48)
+            // CLON EXACTO DE LA REFERENCIA DE LAS PALMERAS:
+            // - ev = 0.0 y highlightBrilliance = 0.65 mantienen el cielo y las casas blancas LUMINOSAS y brillantes
+            // - shadowDepth = 0.72 oscurece únicamente las sombras bajas (el corazón de las palmeras y la reja)
+            // - splitHighWarmth = 0.68 da el tono crema soleado al cielo
             // - Viñeta en 0.0 (0%) y Halation al máximo (1.0 / 100%)
             return FilmLookParameters(
-                ev: -0.36, filmDensity: 0.68, contrastSCurve: 0.78, curvePivot: 0.64, skyCompression: 0.62,
-                shadows: -0.22, highlights: 0.55, blackCrush: 0.48, fadeMatte: 0.14,
-                warmth: 0.16, tint: 0.03, saturation: -0.28, vibrance: -0.26,
-                foliageHue: -0.38, foliageDensity: 0.72, skyHue: -0.32,
-                splitHighWarmth: 0.65, splitShadowTint: 0.18,
-                redTrim: 0.06, greenTrim: -0.04, blueTrim: -0.14,
-                softMist: 0.32, bloom: 1.00, grain: 0.30, vignette: 0.00, nightMode: false
+                ev: 0.0, cameraBiasEV: -0.18, shadowDepth: 0.72, highlightBrilliance: 0.65,
+                contrastSCurve: 0.74, curvePivot: 0.53, shadows: -0.10, highlights: 0.0, fadeMatte: 0.08,
+                warmth: 0.16, tint: 0.02, saturation: -0.24, vibrance: -0.22,
+                foliageHue: -0.32, foliageDensity: 0.38, skyHue: -0.25,
+                splitHighWarmth: 0.68, splitShadowTint: 0.14,
+                redTrim: 0.04, greenTrim: -0.02, blueTrim: -0.08,
+                softMist: 0.35, bloom: 1.00, grain: 0.28, vignette: 0.00, nightMode: false
             )
         case .kodak2383:
-            // Película de cine de Hollywood: Sombras densas azul-petróleo (splitShadowTint: -0.45) y altas luces doradas
             return FilmLookParameters(
-                ev: -0.35, filmDensity: 0.58, contrastSCurve: 0.84, curvePivot: 0.62, skyCompression: 0.48,
-                shadows: -0.18, highlights: 0.40, blackCrush: 0.45, fadeMatte: 0.12,
-                warmth: 0.05, tint: -0.02, saturation: -0.16, vibrance: -0.12,
-                foliageHue: -0.45, foliageDensity: 0.55, skyHue: -0.35,
-                splitHighWarmth: 0.52, splitShadowTint: -0.45,
-                redTrim: 0.05, greenTrim: -0.02, blueTrim: -0.06,
-                softMist: 0.22, bloom: 0.42, grain: 0.28, vignette: 0.28, nightMode: false
+                ev: 0.0, cameraBiasEV: -0.25, shadowDepth: 0.68, highlightBrilliance: 0.50,
+                contrastSCurve: 0.80, curvePivot: 0.52, shadows: -0.12, highlights: 0.0, fadeMatte: 0.08,
+                warmth: 0.06, tint: -0.02, saturation: -0.14, vibrance: -0.10,
+                foliageHue: -0.35, foliageDensity: 0.32, skyHue: -0.30,
+                splitHighWarmth: 0.54, splitShadowTint: -0.45,
+                redTrim: 0.04, greenTrim: 0.0, blueTrim: -0.05,
+                softMist: 0.22, bloom: 0.45, grain: 0.26, vignette: 0.22, nightMode: false
             )
         case .nocturnaClub:
-            // Boliche / Bar oscuro: Negros profundos, neones vibrantes y halation intensa
             return FilmLookParameters(
-                ev: -0.50, filmDensity: 0.52, contrastSCurve: 0.80, curvePivot: 0.60, skyCompression: 0.50,
-                shadows: -0.10, highlights: 0.60, blackCrush: 0.42, fadeMatte: 0.08,
-                warmth: -0.06, tint: 0.08, saturation: 0.08, vibrance: 0.12,
-                foliageHue: 0.0, foliageDensity: 0.30, skyHue: 0.15,
-                splitHighWarmth: 0.40, splitShadowTint: -0.35,
-                redTrim: 0.10, greenTrim: -0.06, blueTrim: 0.08,
-                softMist: 0.45, bloom: 0.90, grain: 0.35, vignette: 0.34, nightMode: true
+                ev: 0.0, cameraBiasEV: -0.40, shadowDepth: 0.64, highlightBrilliance: 0.45,
+                contrastSCurve: 0.76, curvePivot: 0.50, shadows: -0.05, highlights: 0.20, fadeMatte: 0.06,
+                warmth: -0.04, tint: 0.06, saturation: 0.08, vibrance: 0.12,
+                foliageHue: 0.0, foliageDensity: 0.15, skyHue: 0.15,
+                splitHighWarmth: 0.42, splitShadowTint: -0.35,
+                redTrim: 0.08, greenTrim: -0.04, blueTrim: 0.06,
+                softMist: 0.42, bloom: 0.88, grain: 0.34, vignette: 0.28, nightMode: true
             )
         case .portra400:
-            // Kodak Portra 400: Tonos piel dorados/cálidos, sombras suaves y roll-off pastel
             return FilmLookParameters(
-                ev: -0.22, filmDensity: 0.38, contrastSCurve: 0.56, curvePivot: 0.64, skyCompression: 0.45,
-                shadows: 0.08, highlights: 0.42, blackCrush: 0.20, fadeMatte: 0.18,
-                warmth: 0.18, tint: 0.04, saturation: -0.08, vibrance: -0.10,
-                foliageHue: -0.25, foliageDensity: 0.35, skyHue: -0.20,
-                splitHighWarmth: 0.48, splitShadowTint: 0.15,
-                redTrim: 0.08, greenTrim: 0.0, blueTrim: -0.08,
-                softMist: 0.25, bloom: 0.35, grain: 0.22, vignette: 0.14, nightMode: false
+                ev: 0.05, cameraBiasEV: -0.15, shadowDepth: 0.36, highlightBrilliance: 0.60,
+                contrastSCurve: 0.52, curvePivot: 0.54, shadows: 0.10, highlights: 0.0, fadeMatte: 0.14,
+                warmth: 0.18, tint: 0.03, saturation: -0.06, vibrance: -0.08,
+                foliageHue: -0.20, foliageDensity: 0.22, skyHue: -0.18,
+                splitHighWarmth: 0.50, splitShadowTint: 0.12,
+                redTrim: 0.06, greenTrim: 0.0, blueTrim: -0.06,
+                softMist: 0.28, bloom: 0.38, grain: 0.20, vignette: 0.10, nightMode: false
             )
         case .cinestill800T:
-            // Película de tungsteno: atmósfera azul cian nocturna con fuertes halos cálidos en luces
             return FilmLookParameters(
-                ev: -0.40, filmDensity: 0.50, contrastSCurve: 0.72, curvePivot: 0.60, skyCompression: 0.40,
-                shadows: -0.05, highlights: 0.45, blackCrush: 0.34, fadeMatte: 0.10,
-                warmth: -0.32, tint: 0.04, saturation: -0.06, vibrance: 0.0,
-                foliageHue: -0.30, foliageDensity: 0.40, skyHue: 0.30,
-                splitHighWarmth: 0.30, splitShadowTint: -0.60,
-                redTrim: -0.08, greenTrim: 0.04, blueTrim: 0.18,
-                softMist: 0.40, bloom: 0.92, grain: 0.36, vignette: 0.28, nightMode: true
+                ev: 0.0, cameraBiasEV: -0.30, shadowDepth: 0.58, highlightBrilliance: 0.45,
+                contrastSCurve: 0.70, curvePivot: 0.50, shadows: 0.0, highlights: 0.15, fadeMatte: 0.08,
+                warmth: -0.32, tint: 0.04, saturation: -0.05, vibrance: 0.0,
+                foliageHue: -0.25, foliageDensity: 0.25, skyHue: 0.30,
+                splitHighWarmth: 0.28, splitShadowTint: -0.60,
+                redTrim: -0.06, greenTrim: 0.04, blueTrim: 0.16,
+                softMist: 0.38, bloom: 0.90, grain: 0.34, vignette: 0.24, nightMode: true
             )
         case .dispo98:
-            // Cámara desechable años 90: Negros levantados con tinte verde de carrete Fuji y flash cálido
             return FilmLookParameters(
-                ev: -0.25, filmDensity: 0.48, contrastSCurve: 0.76, curvePivot: 0.62, skyCompression: 0.52,
-                shadows: 0.05, highlights: 0.35, blackCrush: 0.25, fadeMatte: 0.34,
-                warmth: 0.06, tint: -0.14, saturation: -0.18, vibrance: -0.12,
-                foliageHue: -0.20, foliageDensity: 0.45, skyHue: -0.25,
-                splitHighWarmth: 0.45, splitShadowTint: -0.25,
-                redTrim: 0.0, greenTrim: 0.12, blueTrim: -0.10,
-                softMist: 0.30, bloom: 0.45, grain: 0.55, vignette: 0.44, nightMode: false
+                ev: 0.0, cameraBiasEV: -0.15, shadowDepth: 0.52, highlightBrilliance: 0.55,
+                contrastSCurve: 0.72, curvePivot: 0.52, shadows: 0.05, highlights: 0.0, fadeMatte: 0.28,
+                warmth: 0.06, tint: -0.14, saturation: -0.16, vibrance: -0.10,
+                foliageHue: -0.15, foliageDensity: 0.30, skyHue: -0.20,
+                splitHighWarmth: 0.46, splitShadowTint: -0.28,
+                redTrim: 0.0, greenTrim: 0.10, blueTrim: -0.08,
+                softMist: 0.28, bloom: 0.45, grain: 0.52, vignette: 0.36, nightMode: false
             )
         case .ccd2004:
-            // Digicam año 2004: Nítida, saturación digital punchy y contraste directo sin velo mate
             return FilmLookParameters(
-                ev: -0.25, filmDensity: 0.35, contrastSCurve: 0.74, curvePivot: 0.54, skyCompression: 0.15,
-                shadows: -0.12, highlights: 0.15, blackCrush: 0.35, fadeMatte: 0.02,
+                ev: 0.0, cameraBiasEV: -0.20, shadowDepth: 0.48, highlightBrilliance: 0.40,
+                contrastSCurve: 0.70, curvePivot: 0.50, shadows: -0.08, highlights: 0.0, fadeMatte: 0.02,
                 warmth: -0.06, tint: 0.04, saturation: 0.18, vibrance: 0.15,
-                foliageHue: 0.05, foliageDensity: 0.10, skyHue: 0.15,
+                foliageHue: 0.05, foliageDensity: 0.05, skyHue: 0.15,
                 splitHighWarmth: 0.05, splitShadowTint: -0.15,
-                redTrim: 0.04, greenTrim: -0.02, blueTrim: 0.08,
-                softMist: 0.0, bloom: 0.14, grain: 0.16, vignette: 0.20, nightMode: false
+                redTrim: 0.04, greenTrim: 0.0, blueTrim: 0.08,
+                softMist: 0.0, bloom: 0.15, grain: 0.15, vignette: 0.16, nightMode: false
             )
         case .polaroid600:
-            // Instantánea vintage: Tono crema nostalgia, sombras mate suaves y bordes marcados
             return FilmLookParameters(
-                ev: -0.25, filmDensity: 0.52, contrastSCurve: 0.58, curvePivot: 0.66, skyCompression: 0.65,
-                shadows: 0.10, highlights: 0.50, blackCrush: 0.20, fadeMatte: 0.38,
-                warmth: 0.20, tint: 0.05, saturation: -0.30, vibrance: -0.24,
-                foliageHue: -0.40, foliageDensity: 0.55, skyHue: -0.40,
-                splitHighWarmth: 0.68, splitShadowTint: 0.25,
-                redTrim: 0.10, greenTrim: 0.0, blueTrim: -0.16,
-                softMist: 0.42, bloom: 0.55, grain: 0.32, vignette: 0.38, nightMode: false
+                ev: 0.05, cameraBiasEV: -0.10, shadowDepth: 0.42, highlightBrilliance: 0.65,
+                contrastSCurve: 0.54, curvePivot: 0.54, shadows: 0.12, highlights: 0.0, fadeMatte: 0.32,
+                warmth: 0.20, tint: 0.04, saturation: -0.26, vibrance: -0.20,
+                foliageHue: -0.30, foliageDensity: 0.35, skyHue: -0.35,
+                splitHighWarmth: 0.70, splitShadowTint: 0.22,
+                redTrim: 0.08, greenTrim: 0.0, blueTrim: -0.12,
+                softMist: 0.40, bloom: 0.55, grain: 0.30, vignette: 0.30, nightMode: false
             )
         case .superia400:
-            // Fuji Superia: Verdes esmeralda intensos y sombras con sutil carácter magenta
             return FilmLookParameters(
-                ev: -0.32, filmDensity: 0.48, contrastSCurve: 0.70, curvePivot: 0.62, skyCompression: 0.38,
-                shadows: -0.10, highlights: 0.30, blackCrush: 0.32, fadeMatte: 0.14,
+                ev: 0.0, cameraBiasEV: -0.22, shadowDepth: 0.54, highlightBrilliance: 0.50,
+                contrastSCurve: 0.66, curvePivot: 0.52, shadows: -0.05, highlights: 0.0, fadeMatte: 0.10,
                 warmth: -0.02, tint: 0.10, saturation: -0.06, vibrance: 0.0,
-                foliageHue: -0.55, foliageDensity: 0.48, skyHue: -0.15,
-                splitHighWarmth: 0.25, splitShadowTint: -0.15,
+                foliageHue: -0.45, foliageDensity: 0.32, skyHue: -0.12,
+                splitHighWarmth: 0.28, splitShadowTint: -0.18,
                 redTrim: 0.02, greenTrim: 0.08, blueTrim: -0.04,
-                softMist: 0.18, bloom: 0.30, grain: 0.30, vignette: 0.24, nightMode: false
+                softMist: 0.18, bloom: 0.32, grain: 0.28, vignette: 0.20, nightMode: false
             )
         case .velvia50:
-            // Fuji Velvia 50: Diapositiva dramática, negros súper densos y colores profundos
             return FilmLookParameters(
-                ev: -0.40, filmDensity: 0.60, contrastSCurve: 0.86, curvePivot: 0.58, skyCompression: 0.25,
-                shadows: -0.25, highlights: 0.25, blackCrush: 0.50, fadeMatte: 0.04,
+                ev: 0.0, cameraBiasEV: -0.28, shadowDepth: 0.68, highlightBrilliance: 0.45,
+                contrastSCurve: 0.82, curvePivot: 0.50, shadows: -0.15, highlights: 0.0, fadeMatte: 0.02,
                 warmth: 0.06, tint: 0.06, saturation: 0.28, vibrance: 0.24,
-                foliageHue: -0.20, foliageDensity: 0.40, skyHue: 0.20,
-                splitHighWarmth: 0.20, splitShadowTint: -0.20,
-                redTrim: 0.08, greenTrim: 0.04, blueTrim: 0.06,
-                softMist: 0.08, bloom: 0.24, grain: 0.16, vignette: 0.30, nightMode: false
+                foliageHue: -0.15, foliageDensity: 0.22, skyHue: 0.20,
+                splitHighWarmth: 0.22, splitShadowTint: -0.20,
+                redTrim: 0.06, greenTrim: 0.04, blueTrim: 0.06,
+                softMist: 0.08, bloom: 0.25, grain: 0.15, vignette: 0.24, nightMode: false
             )
         case .gold200:
-            // Kodak Gold 200: Atardecer dorado cálido con sombras tostadas ricas
             return FilmLookParameters(
-                ev: -0.30, filmDensity: 0.50, contrastSCurve: 0.68, curvePivot: 0.64, skyCompression: 0.50,
-                shadows: -0.08, highlights: 0.40, blackCrush: 0.30, fadeMatte: 0.18,
-                warmth: 0.24, tint: 0.02, saturation: -0.08, vibrance: -0.06,
-                foliageHue: -0.25, foliageDensity: 0.45, skyHue: -0.30,
-                splitHighWarmth: 0.60, splitShadowTint: 0.28,
-                redTrim: 0.12, greenTrim: 0.02, blueTrim: -0.14,
-                softMist: 0.28, bloom: 0.42, grain: 0.28, vignette: 0.24, nightMode: false
+                ev: 0.04, cameraBiasEV: -0.18, shadowDepth: 0.50, highlightBrilliance: 0.62,
+                contrastSCurve: 0.64, curvePivot: 0.53, shadows: 0.0, highlights: 0.0, fadeMatte: 0.14,
+                warmth: 0.24, tint: 0.02, saturation: -0.06, vibrance: -0.05,
+                foliageHue: -0.20, foliageDensity: 0.28, skyHue: -0.25,
+                splitHighWarmth: 0.64, splitShadowTint: 0.25,
+                redTrim: 0.10, greenTrim: 0.02, blueTrim: -0.10,
+                softMist: 0.28, bloom: 0.45, grain: 0.26, vignette: 0.20, nightMode: false
             )
         case .aerochrome:
-            // Kodak Aerochrome IR: Follaje rojo carmesí infrarrojo y cielos profundos
             return FilmLookParameters(
-                ev: -0.35, filmDensity: 0.52, contrastSCurve: 0.76, curvePivot: 0.60, skyCompression: 0.35,
-                shadows: -0.15, highlights: 0.30, blackCrush: 0.38, fadeMatte: 0.10,
+                ev: 0.0, cameraBiasEV: -0.25, shadowDepth: 0.56, highlightBrilliance: 0.50,
+                contrastSCurve: 0.72, curvePivot: 0.52, shadows: -0.08, highlights: 0.0, fadeMatte: 0.08,
                 warmth: 0.0, tint: 0.12, saturation: 0.10, vibrance: 0.10,
-                foliageHue: 0.85, foliageDensity: 0.20, skyHue: -0.25,
-                splitHighWarmth: 0.20, splitShadowTint: -0.20,
-                redTrim: 0.22, greenTrim: -0.20, blueTrim: 0.0,
-                softMist: 0.22, bloom: 0.40, grain: 0.28, vignette: 0.26, nightMode: false
+                foliageHue: 0.85, foliageDensity: 0.15, skyHue: -0.25,
+                splitHighWarmth: 0.25, splitShadowTint: -0.20,
+                redTrim: 0.20, greenTrim: -0.18, blueTrim: 0.0,
+                softMist: 0.22, bloom: 0.40, grain: 0.26, vignette: 0.22, nightMode: false
             )
         case .bleachBypass:
-            // Retención de plata: Contraste metálico implacable y colores casi monocromáticos
             return FilmLookParameters(
-                ev: -0.42, filmDensity: 0.64, contrastSCurve: 0.90, curvePivot: 0.60, skyCompression: 0.45,
-                shadows: -0.28, highlights: 0.35, blackCrush: 0.52, fadeMatte: 0.14,
+                ev: 0.0, cameraBiasEV: -0.30, shadowDepth: 0.75, highlightBrilliance: 0.50,
+                contrastSCurve: 0.86, curvePivot: 0.51, shadows: -0.18, highlights: 0.0, fadeMatte: 0.10,
                 warmth: -0.06, tint: 0.0, saturation: -0.62, vibrance: -0.45,
-                foliageHue: -0.35, foliageDensity: 0.55, skyHue: -0.25,
-                splitHighWarmth: 0.28, splitShadowTint: -0.30,
-                redTrim: 0.0, greenTrim: 0.0, blueTrim: -0.05,
-                softMist: 0.18, bloom: 0.22, grain: 0.46, vignette: 0.42, nightMode: false
+                foliageHue: -0.30, foliageDensity: 0.40, skyHue: -0.20,
+                splitHighWarmth: 0.30, splitShadowTint: -0.30,
+                redTrim: 0.0, greenTrim: 0.0, blueTrim: -0.04,
+                softMist: 0.18, bloom: 0.22, grain: 0.45, vignette: 0.36, nightMode: false
             )
         case .ilfordHP5:
             return FilmLookParameters(
-                ev: -0.28, filmDensity: 0.42, contrastSCurve: 0.58, curvePivot: 0.62, skyCompression: 0.35,
-                shadows: 0.05, highlights: 0.35, blackCrush: 0.24, fadeMatte: 0.22,
+                ev: 0.0, cameraBiasEV: -0.20, shadowDepth: 0.45, highlightBrilliance: 0.50,
+                contrastSCurve: 0.56, curvePivot: 0.52, shadows: 0.08, highlights: 0.0, fadeMatte: 0.18,
+                warmth: 0.0, tint: 0.0, saturation: -1.0, vibrance: 0.0,
+                foliageHue: 0.0, foliageDensity: 0.25, skyHue: 0.0,
+                splitHighWarmth: 0.0, splitShadowTint: 0.0,
+                redTrim: 0.0, greenTrim: 0.0, blueTrim: 0.0,
+                softMist: 0.18, bloom: 0.25, grain: 0.46, vignette: 0.24, nightMode: false
+            )
+        case .triX400:
+            return FilmLookParameters(
+                ev: 0.0, cameraBiasEV: -0.25, shadowDepth: 0.72, highlightBrilliance: 0.55,
+                contrastSCurve: 0.84, curvePivot: 0.51, shadows: -0.15, highlights: 0.0, fadeMatte: 0.08,
                 warmth: 0.0, tint: 0.0, saturation: -1.0, vibrance: 0.0,
                 foliageHue: 0.0, foliageDensity: 0.35, skyHue: 0.0,
                 splitHighWarmth: 0.0, splitShadowTint: 0.0,
                 redTrim: 0.0, greenTrim: 0.0, blueTrim: 0.0,
-                softMist: 0.20, bloom: 0.26, grain: 0.48, vignette: 0.28, nightMode: false
-            )
-        case .triX400:
-            return FilmLookParameters(
-                ev: -0.38, filmDensity: 0.58, contrastSCurve: 0.86, curvePivot: 0.60, skyCompression: 0.30,
-                shadows: -0.22, highlights: 0.30, blackCrush: 0.48, fadeMatte: 0.10,
-                warmth: 0.0, tint: 0.0, saturation: -1.0, vibrance: 0.0,
-                foliageHue: 0.0, foliageDensity: 0.45, skyHue: 0.0,
-                splitHighWarmth: 0.0, splitShadowTint: 0.0,
-                redTrim: 0.0, greenTrim: 0.0, blueTrim: 0.0,
-                softMist: 0.15, bloom: 0.24, grain: 0.60, vignette: 0.38, nightMode: false
+                softMist: 0.14, bloom: 0.24, grain: 0.58, vignette: 0.32, nightMode: false
             )
         }
     }
@@ -348,7 +335,7 @@ struct DevelopedPhotoResult {
     let exifSummary: String
 }
 
-// MARK: - 3. Motor Polinómico de Emulsión de 22 Parámetros (Sin Velo Blanco + Densidad Gamma Real)
+// MARK: - 3. Motor Polinómico de Emulsión (Altas Luces Brillantes + Oscurecimiento Exclusivo de Sombras)
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
@@ -368,8 +355,7 @@ class CinematicPipeline {
         lightLeakAmount: Float = 0.0,
         anamorphicMode: Bool = false,
         isRAW: Bool,
-        is48MP: Bool,
-        applyEVInSoftware: Bool = false
+        is48MP: Bool
     ) -> CIImage {
         var current = input
         let extent = current.extent
@@ -381,13 +367,11 @@ class CinematicPipeline {
         
         let scaleMultiplier = max(1.0, min(extent.width, extent.height) / 1080.0)
         
-        // 0. Aplicar Exposición (EV) y Densidad de Película para evitar que salga blanca/brillante
-        // En Studio (applyEVInSoftware = true) aplica el EV completo; en cámara aplica un ajuste fino de densidad
-        let effectiveEV = (applyEVInSoftware ? params.ev : (params.ev * 0.35)) - (params.filmDensity * 0.32)
-        if abs(effectiveEV) > 0.01 {
+        // 0. Exposición Manual (Por defecto es 0.0 en todas las cámaras para NUNCA subexponer el cielo ni las casas blancas)
+        if abs(params.ev) > 0.01 {
             let exp = CIFilter.exposureAdjust()
             exp.inputImage = current
-            exp.ev = effectiveEV
+            exp.ev = params.ev
             if let out = exp.outputImage?.cropped(to: extent) { current = out }
         }
         
@@ -412,23 +396,25 @@ class CinematicPipeline {
             let wbFix = CIFilter.temperatureAndTint()
             wbFix.inputImage = current
             wbFix.neutral = CIVector(x: 6500, y: 0)
-            let tempShift = CGFloat(-params.warmth * 1100)
+            let tempShift = CGFloat(-params.warmth * 950)
             let tintShift = CGFloat(params.tint * 45)
             wbFix.targetNeutral = CIVector(x: 6500 + tempShift, y: tintShift)
             if let out = wbFix.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 3. Compresión de Altas Luces y Control de Sombras (Sin sobreiluminar las nubes)
-        let hs = CIFilter.highlightShadowAdjust()
-        hs.inputImage = current
-        let hlTarget = max(0.15, min(0.95, 0.55 - (params.highlights * 0.45)))
-        let shTarget = max(-0.45, min(0.65, params.shadows * 0.55))
-        hs.highlightAmount = hlTarget
-        hs.shadowAmount = shTarget
-        hs.radius = Float(30.0 * scaleMultiplier)
-        if let out = hs.outputImage?.cropped(to: extent) { current = out }
+        // 3. Control de Sombras y Altas Luces (highlightAmount = 1.0 preserva el 100% de la luz del cielo sin apagarlo)
+        if abs(params.shadows) > 0.02 || params.highlights > 0.02 {
+            let hs = CIFilter.highlightShadowAdjust()
+            hs.inputImage = current
+            hs.highlightAmount = max(0.55, 1.0 - (params.highlights * 0.40))
+            hs.shadowAmount = max(-0.35, min(0.65, params.shadows * 0.45))
+            hs.radius = Float(28.0 * scaleMultiplier)
+            if let out = hs.outputImage?.cropped(to: extent) { current = out }
+        }
         
-        // 4. QUÍMICA DE FOLLAJE Y SEPARACIÓN CROMÁTICA (Oscurece las palmeras y el pasto sin volverlos blancos ni amarillos)
+        // 4. QUÍMICA DE FOLLAJE PRESERVADORA DE BLANCOS:
+        // La suma de cada fila (R, G, B) es >= 1.00, por lo que las casas blancas y las nubes NUNCA pierden brillo,
+        // pero donde domina el verde (palmeras y pasto), el verde brillante se vuelve verde pino profundo
         if profile == .aerochrome {
             let aero = CIFilter.colorMatrix()
             aero.inputImage = current
@@ -437,18 +423,19 @@ class CinematicPipeline {
             aero.bVector = CIVector(x: -0.05, y: 0.08, z: 0.95, w: 0)
             if let out = aero.outputImage?.cropped(to: extent) { current = out }
         } else {
-            let folDens = CGFloat(params.foliageDensity * 0.22)
-            let folCool = CGFloat(params.foliageHue * 0.14)
-            let rT = CGFloat(params.redTrim * 0.22)
-            let gT = CGFloat(params.greenTrim * 0.22)
-            let bT = CGFloat(params.blueTrim * 0.22)
+            let folDens = CGFloat(params.foliageDensity * 0.18)
+            let folCool = CGFloat(params.foliageHue * 0.12)
+            let rT = CGFloat(params.redTrim * 0.18)
+            let gT = CGFloat(params.greenTrim * 0.18)
+            let bT = CGFloat(params.blueTrim * 0.18)
             
             let hslMatrix = CIFilter.colorMatrix()
             hslMatrix.inputImage = current
-            // En píxeles verdes (G > R y G > B), reduce la luminancia del canal verde y empuja el tono hacia verde pino/oliva oscuro
-            hslMatrix.rVector = CIVector(x: 1.02 + rT, y: -folDens * 0.45 + folCool * 0.3, z: folDens * 0.15, w: 0)
-            hslMatrix.gVector = CIVector(x: 0.01, y: 0.95 - folDens * 0.55 + gT, z: 0.02 + folDens * 0.20, w: 0)
-            hslMatrix.bVector = CIVector(x: -0.02, y: -folDens * 0.35 - folCool * 0.25, z: 0.98 + folCool * 0.25 + bT, w: 0)
+            // En blancos (R=G=B=1): R_out = 1.00, G_out = 1.00, B_out = 1.00 (CERO oscurecimiento del cielo y casas)
+            // En hojas verdes (G > R, B): G_out baja y R_out baja, oscureciendo solo el follaje
+            hslMatrix.rVector = CIVector(x: 1.00 + folDens * 0.35 + rT, y: -folDens * 0.50 + folCool * 0.25, z: folDens * 0.15 - folCool * 0.25, w: 0)
+            hslMatrix.gVector = CIVector(x: folDens * 0.25, y: 1.00 - folDens * 0.50 + gT, z: folDens * 0.25, w: 0)
+            hslMatrix.bVector = CIVector(x: 0.00, y: -folDens * 0.20 - folCool * 0.20, z: 1.00 + folDens * 0.20 + folCool * 0.20 + bT, w: 0)
             hslMatrix.biasVector = CIVector(x: 0, y: 0, z: 0, w: 0)
             if let out = hslMatrix.outputImage?.cropped(to: extent) { current = out }
         }
@@ -472,60 +459,64 @@ class CinematicPipeline {
             if let out = noir.outputImage?.cropped(to: extent) { current = out }
             cc.inputImage = current
             cc.saturation = 0.0
-            cc.contrast = 1.10
+            cc.contrast = 1.08
         } else {
             cc.saturation = max(0.0, 1.0 + params.saturation * 0.65)
-            cc.contrast = 1.04
+            cc.contrast = 1.02
         }
         if let out = cc.outputImage?.cropped(to: extent) { current = out }
         
-        // 6. SPLIT-TONING POLINÓMICO (Cielo crema cálido arriba + Sombras tostadas 70s o Teal de cine abajo)
+        // 6. SPLIT-TONING POLINÓMICO LUMINOSO:
+        // Mantiene el Rojo al 100%+ y el Verde al 98%+ en las altas luces mientras recorta solo el Azul arriba,
+        // transformando las nubes en crema cálido LUMINOSO (sin volverlas grises como en image_c535e0.jpg)
         if (params.splitHighWarmth > 0.01 || abs(params.splitShadowTint) > 0.01) && profile != .ilfordHP5 && profile != .triX400 {
             let poly = CIFilter.colorPolynomial()
             poly.inputImage = current
             let hiWarm = CGFloat(params.splitHighWarmth)
-            let shTint = CGFloat(params.splitShadowTint) // Positivo = sombras cálidas 70s, Negativo = sombras frías Teal
+            let shTint = CGFloat(params.splitShadowTint)
             
             poly.redCoefficients = CIVector(
-                x: max(0.0, shTint * 0.018),
-                y: 0.95,
-                z: 0.06 * hiWarm,
+                x: max(0.0, shTint * 0.014),
+                y: 0.98,
+                z: 0.05 * hiWarm,
                 w: 0.0
             )
             poly.greenCoefficients = CIVector(
-                x: abs(shTint) * 0.005,
-                y: 0.95,
-                z: 0.025 * hiWarm,
+                x: abs(shTint) * 0.004,
+                y: 0.98,
+                z: 0.015 * hiWarm,
                 w: 0.0
             )
             poly.blueCoefficients = CIVector(
-                x: max(0.0, -shTint * 0.024),
-                y: 0.93 - (0.04 * hiWarm),
-                z: -0.07 * hiWarm,
+                x: max(0.0, -shTint * 0.020),
+                y: 0.97 - (0.04 * hiWarm),
+                z: -0.09 * hiWarm,
                 w: 0.0
             )
             if let out = poly.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 7. CURVA S DENSA + FILM GAMMA + TECHO CREMA (El secreto para que NO se vea blanca ni brillante como en image_c5aa9a.jpg)
+        // 7. CURVA DE SOMBRAS PROFUNDAS Y ALTAS LUCES BRILLANTES (El corazón del look de referencia):
+        // - Punto 1 (0.25): Hundido por `shadowDepth` (de 0.25 baja a 0.14) para oscurecer las sombras de las palmeras y troncos
+        // - Punto 2 (0.50): Se mantiene equilibrado (~0.48) para no apagar las fachadas ni el paisaje
+        // - Punto 3 (0.75) y Punto 4 (1.00): Impulsados por `highlightBrilliance` (0.78 y 0.96) para que el cielo brille con luz solar crema
         let sAmount = Double(params.contrastSCurve)
-        let density = Double(params.filmDensity)
-        let crush = Double(params.blackCrush)
+        let shDepth = Double(params.shadowDepth)
+        let hiBrill = Double(params.highlightBrilliance)
         let matteLift = Double(params.fadeMatte) * 0.055
-        let skyComp = Double(params.skyCompression) * 0.085
         
         let curve = CIFilter.toneCurve()
         curve.inputImage = current
         
-        let p0 = min(0.07, 0.008 + matteLift)
-        // Sombras bajas profundas como el corazón de las palmeras en image_c5aa7d.jpg
-        let p1 = max(p0 + 0.03, 0.20 - (sAmount * 0.06) - (crush * 0.08) - (density * 0.04) + (matteLift * 0.20))
-        // Medios tonos con densidad analógica (0.43 en vez de 0.54) para quitar toda la blancura lavada
-        let p2 = max(0.38, min(0.52, 0.48 - (density * 0.09)))
-        // Hombro de altas luces controlado
-        let p3 = max(0.66, min(0.82, 0.75 + (sAmount * 0.03) - (density * 0.04) - (skyComp * 0.4)))
-        // Techo comprimido a crema (0.89 en Palms 70s) para que el cielo tenga color papel vintage y no blanco brillante
-        let p4 = max(0.86, 0.95 - skyComp)
+        let p0 = min(0.06, 0.008 + matteLift)
+        // Oscurece selectivamente las sombras bajas (0.13 - 0.15 en Palms 70s)
+        let p1 = max(p0 + 0.04, 0.24 - (shDepth * 0.11) - (sAmount * 0.03) + (matteLift * 0.18))
+        // Medios tonos vivos (0.48) para que la escena tenga luz de día
+        let p2 = max(0.45, min(0.55, Double(params.curvePivot) - (shDepth * 0.05) + (hiBrill * 0.03)))
+        // Altas luces abiertas y luminosas (0.78)
+        let p3 = max(0.73, min(0.86, 0.74 + (hiBrill * 0.07) + (sAmount * 0.02)))
+        // Blanco crema luminoso arriba (0.955)
+        let p4 = max(0.92, min(0.98, 0.93 + (hiBrill * 0.05)))
         
         curve.point0 = CGPoint(x: 0.00, y: p0)
         curve.point1 = CGPoint(x: 0.25, y: p1)
@@ -534,14 +525,13 @@ class CinematicPipeline {
         curve.point4 = CGPoint(x: 1.00, y: p4)
         if let out = curve.outputImage?.cropped(to: extent) { current = out }
         
-        // 8. Halation / Soft Mist Controlado (Brilla en bordes de contraluces sin blanquear toda la imagen)
+        // 8. Halation / Soft Mist Cálido (Da el resplandor solar alrededor de las copas de las palmeras contra el cielo)
         let totalGlow = max(params.bloom, params.softMist)
         if totalGlow > 0.04 {
             let bloom = CIFilter.bloom()
             bloom.inputImage = current.clampedToExtent()
-            bloom.radius = Float(min(22.0, (12.0 + Double(params.softMist) * 8.0) * scaleMultiplier))
-            // Intensidad calibrada para no levantar el punto negro ni blanquear las hojas
-            bloom.intensity = (params.bloom * 0.22) + (params.softMist * 0.12)
+            bloom.radius = Float(min(24.0, (14.0 + Double(params.softMist) * 8.0) * scaleMultiplier))
+            bloom.intensity = (params.bloom * 0.28) + (params.softMist * 0.14)
             if let out = bloom.outputImage?.cropped(to: extent) { current = out }
         }
         
@@ -576,7 +566,7 @@ class CinematicPipeline {
             if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 11. Light Leak con Intensidad Regulable y Anamórfico
+        // 11. Light Leak y Anamórfico
         if lightLeakAmount > 0.04 {
             let grad = CIFilter.linearGradient()
             grad.point0 = CGPoint(x: 0, y: extent.height * 0.85)
@@ -790,8 +780,7 @@ class CinematicPipeline {
             lightLeakAmount: lightLeakAmount,
             anamorphicMode: anamorphicMode,
             isRAW: false,
-            is48MP: false,
-            applyEVInSoftware: true
+            is48MP: false
         )
         guard let cg = ciContext.createCGImage(filtered, from: filtered.extent) else { return nil }
         return UIImage(cgImage: cg)
@@ -838,7 +827,7 @@ class CinematicPipeline {
             rawFilter.sharpnessAmount = 0.20
             rawFilter.localToneMapAmount = 0.0
             rawFilter.boostAmount = 0.48
-            rawFilter.baselineExposure = -0.15
+            rawFilter.baselineExposure = -0.10
             rawFilter.scaleFactor = 1.0
             
             if wbTemp > 2000 && wbTemp < 10000 {
@@ -889,8 +878,7 @@ class CinematicPipeline {
             lightLeakAmount: lightLeakAmount,
             anamorphicMode: anamorphicMode,
             isRAW: usedCIRAW,
-            is48MP: is48MP,
-            applyEVInSoftware: isFromGallery
+            is48MP: is48MP
         )
         
         guard let cgImage = ciContext.createCGImage(processed, from: processed.extent) else {
@@ -955,10 +943,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var lastExifSummary = "1/125s | f/1.6 | ISO 64"
     var currentZoom: CGFloat = 1.0
     
-    // oCam va PRIMERO y abierta por defecto al iniciar la app
     var selectedProfile: FilmProfile = .ocamMaster
     var params: FilmLookParameters = FilmProfile.ocamMaster.recommended
-    var simpleMacroIntensity: Float = 0.70 // Control maestro para el Modo Sencillo
+    var simpleMacroIntensity: Float = 0.75
     
     var portraitDepthBlur: Float = 0.0
     var nightExposureSeconds: Float = 0.15
@@ -1004,16 +991,15 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     func applyRecommendedForCurrentProfile() {
         params = selectedProfile.recommended
         simpleMacroIntensity = 0.75
-        setExposure(params.ev)
+        setCameraExposureBias(params.cameraBiasEV)
         updateNightModeHardware()
     }
     
-    /// Ajusta proporcionalmente la densidad, curva S y colorimetría desde el deslizador "INTENSIDAD LOOK" del Modo Sencillo
     func applySimpleIntensity(_ val: Float) {
         simpleMacroIntensity = val
         let rec = selectedProfile.recommended
         let factor = val / 0.75
-        params.filmDensity = min(1.0, rec.filmDensity * factor)
+        params.shadowDepth = min(1.0, rec.shadowDepth * factor)
         params.contrastSCurve = min(1.0, rec.contrastSCurve * factor)
         params.foliageDensity = min(1.0, rec.foliageDensity * factor)
         params.splitHighWarmth = min(1.0, rec.splitHighWarmth * factor)
@@ -1024,7 +1010,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         simpleMacroIntensity = 0.0
         portraitDepthBlur = 0.0
         lightLeakEnabled = false
-        setExposure(0.0)
+        setCameraExposureBias(0.0)
         updateNightModeHardware()
     }
     
@@ -1129,7 +1115,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         session.commitConfiguration()
         session.startRunning()
         
-        applyExposureInternal(params.ev)
+        applyExposureInternal(params.cameraBiasEV)
         updateStatusBadge()
     }
     
@@ -1201,7 +1187,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         }
         
         let want48 = use48MPMode && is48MPSupported && (currentZoom == 1.0)
-        let targetEV = params.ev
+        let targetEV = params.cameraBiasEV
         sessionQueue.async {
             guard let device = self.currentDevice else { return }
             self.session.beginConfiguration()
@@ -1237,8 +1223,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         }
     }
     
-    func setExposure(_ ev: Float) {
-        params.ev = ev
+    func setCameraExposureBias(_ ev: Float) {
+        params.cameraBiasEV = ev
         let now = Date()
         guard now.timeIntervalSince(lastExposureUpdate) > 0.06 else { return }
         lastExposureUpdate = now
@@ -1261,7 +1247,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     func switchCameraLens(factor: CGFloat) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         currentZoom = factor
-        let targetEV = params.ev
+        let targetEV = params.cameraBiasEV
         let want48 = use48MPMode && (factor == 1.0)
         
         sessionQueue.async {
@@ -1560,7 +1546,7 @@ struct NativeCameraPreview: UIViewRepresentable {
     }
 }
 
-// MARK: - 6. Capa de Previsualización Fiel en Vivo (Con Densidad Gamma Real)
+// MARK: - 6. Capa de Previsualización Fiel en Vivo (Altas Luces Brillantes + Sombras Densas)
 struct LiveOpticalEffectsView: View {
     let profile: FilmProfile
     let params: FilmLookParameters
@@ -1585,18 +1571,11 @@ struct LiveOpticalEffectsView: View {
                 ZStack {
                     filmLiveOverlay(for: profile)
                     
-                    // Densidad Gamma en Vivo (Evita que la previsualización se vea blanca lavada)
-                    if params.filmDensity > 0.05 {
-                        Color(red: 0.08, green: 0.07, blue: 0.05)
-                            .opacity(Double(params.filmDensity) * 0.24)
-                            .blendMode(.multiply)
-                    }
-                    
-                    // Tinte Crema Cálido en el Cielo (Sin encandilar)
+                    // Tinte Crema Cálido Luminoso en el Cielo (Sin oscurecer la imagen)
                     if params.splitHighWarmth > 0.05 {
                         LinearGradient(
                             colors: [
-                                Color(red: 0.96, green: 0.88, blue: 0.72).opacity(Double(params.splitHighWarmth) * 0.22),
+                                Color(red: 1.0, green: 0.94, blue: 0.78).opacity(Double(params.splitHighWarmth) * 0.22),
                                 Color.clear
                             ],
                             startPoint: .top,
@@ -1607,7 +1586,7 @@ struct LiveOpticalEffectsView: View {
                     
                     if params.fadeMatte > 0.02 {
                         Color(white: 0.12)
-                            .opacity(Double(params.fadeMatte) * 0.18)
+                            .opacity(Double(params.fadeMatte) * 0.16)
                             .blendMode(.screen)
                     }
                     
@@ -1623,9 +1602,9 @@ struct LiveOpticalEffectsView: View {
                     
                     if abs(params.warmth) > 0.02 {
                         (params.warmth > 0
-                            ? Color(red: 1.0, green: 0.78, blue: 0.44)
+                            ? Color(red: 1.0, green: 0.80, blue: 0.46)
                             : Color(red: 0.35, green: 0.75, blue: 1.0))
-                            .opacity(Double(abs(params.warmth)) * 0.16)
+                            .opacity(Double(abs(params.warmth)) * 0.15)
                             .blendMode(.softLight)
                     }
                     
@@ -1751,8 +1730,8 @@ struct LiveOpticalEffectsView: View {
         case .cineChrome:
             LinearGradient(
                 colors: [
-                    Color(red: 0.96, green: 0.84, blue: 0.62).opacity(0.20),
-                    Color(red: 0.10, green: 0.22, blue: 0.16).opacity(0.22)
+                    Color(red: 1.0, green: 0.92, blue: 0.72).opacity(0.18),
+                    Color.clear
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -1761,8 +1740,8 @@ struct LiveOpticalEffectsView: View {
         case .kodak2383:
             LinearGradient(
                 colors: [
-                    Color(red: 0.98, green: 0.86, blue: 0.65).opacity(0.14),
-                    Color(red: 0.04, green: 0.24, blue: 0.32).opacity(0.22)
+                    Color(red: 0.98, green: 0.88, blue: 0.68).opacity(0.14),
+                    Color(red: 0.04, green: 0.22, blue: 0.30).opacity(0.18)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -1790,7 +1769,7 @@ struct SeededRandomGenerator: RandomNumberGenerator {
     }
 }
 
-// MARK: - 7. Laboratorio oCam Studio con Modo Sencillo y Modo PRO (22 Controles)
+// MARK: - 7. Laboratorio oCam Studio (Con Sombra Profunda + Luz Cielo Independientes)
 struct GalleryDarkroomView: View {
     let originalData: Data
     var onSaveSuccess: (UIImage, String) -> Void
@@ -1798,8 +1777,7 @@ struct GalleryDarkroomView: View {
     
     @State private var selectedProfile: FilmProfile = .cineChrome
     @State private var params: FilmLookParameters = FilmProfile.cineChrome.recommended
-    @State private var isProMode = false // Inicia en Modo Sencillo para no sobrecargar, con switch a PRO
-    @State private var simpleIntensity: Float = 0.75
+    @State private var isProMode = false
     @State private var activeTab: Int = 0
     @State private var portraitDepthBlur: Float = 0.0
     @State private var lightLeakEnabled = false
@@ -1854,7 +1832,6 @@ struct GalleryDarkroomView: View {
                     Menu {
                         Button("Recomendado (\(selectedProfile.rawValue))", systemImage: "sparkles") {
                             params = selectedProfile.recommended
-                            simpleIntensity = 0.75
                             updatePreview()
                         }
                         Button("Sin Filtro (Cámara Normal)", systemImage: "camera") {
@@ -1913,7 +1890,7 @@ struct GalleryDarkroomView: View {
                         Text(isShowingOriginal ? "ORIGINAL SIN FILTRO" : "oCam Studio • \(selectedProfile.rawValue)")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.95))
-                        Text("Density \(Int(params.filmDensity * 100))% | EV \(String(format: "%+.2f", params.ev))")
+                        Text("Shadows \(Int(params.shadowDepth * 100))% | Sky Light \(Int(params.highlightBrilliance * 100))%")
                             .font(.system(size: 9.5, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.70))
                     }
@@ -1926,7 +1903,6 @@ struct GalleryDarkroomView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 14)
                 
-                // Carrusel de las 17 Cámaras
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(FilmProfile.allCases) { profile in
@@ -1934,7 +1910,6 @@ struct GalleryDarkroomView: View {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 selectedProfile = profile
                                 params = profile.recommended
-                                simpleIntensity = 0.75
                                 updatePreview()
                             } label: {
                                 Text(profile.rawValue)
@@ -1952,16 +1927,14 @@ struct GalleryDarkroomView: View {
                     .padding(.horizontal, 16)
                 }
                 
-                // Panel de Ajustes con Selector SIMPLE | PRO
                 VStack(spacing: 8) {
                     HStack {
-                        Text(isProMode ? "MODO PRO (22 CONTROLES)" : "AJUSTE RÁPIDO SENCILLO")
+                        Text(isProMode ? "MODO PRO (22 CONTROLES)" : "MODO SENCILLO")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.7))
                         
                         Spacer()
                         
-                        // Selector SIMPLE vs PRO
                         HStack(spacing: 0) {
                             Button {
                                 withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { isProMode = false }
@@ -1993,28 +1966,27 @@ struct GalleryDarkroomView: View {
                     .padding(.bottom, 2)
                     
                     if !isProMode {
-                        // MODO SENCILLO: 4 Controles Esenciales para no abrumar
-                        darkroomSlider(title: "Luz / Exposición", value: $params.ev, range: -1.5...1.0, format: "%+.2f EV")
-                        darkroomSlider(title: "Densidad Película", value: $params.filmDensity, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                        darkroomSlider(title: "Calidez / Crema", value: $params.splitHighWarmth, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                        darkroomSlider(title: "Grano 35mm", value: $params.grain, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        // MODO SENCILLO: Control directo de Sombras Profundas y Luz del Cielo sin complicarse
+                        darkroomSlider(title: "Sombra Profunda", value: $params.shadowDepth, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        darkroomSlider(title: "Luz Cielo (Brillo)", value: $params.highlightBrilliance, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        darkroomSlider(title: "Crema Cálido", value: $params.splitHighWarmth, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                        darkroomSlider(title: "Exposición General", value: $params.ev, range: -1.0...1.0, format: "%+.2f EV")
                     } else {
-                        // MODO PRO: Los 22 Controles en 5 Pestañas
                         if activeTab == 0 {
-                            darkroomSlider(title: "Exposure (EV)", value: $params.ev, range: -1.5...1.0, format: "%+.2f")
-                            darkroomSlider(title: "Film Density (Gamma)", value: $params.filmDensity, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Shadow Depth (Dark)", value: $params.shadowDepth, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Sky Brilliance", value: $params.highlightBrilliance, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                             darkroomSlider(title: "S-Curve Contrast", value: $params.contrastSCurve, range: 0.0...1.0, format: "%.2f", multiplier: 4.0)
-                            darkroomSlider(title: "Sky Compression", value: $params.skyCompression, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                            darkroomSlider(title: "Black Crush", value: $params.blackCrush, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Midtone Pivot", value: $params.curvePivot, range: 0.42...0.60, format: "%.2f")
+                            darkroomSlider(title: "Exposure (EV)", value: $params.ev, range: -1.0...1.0, format: "%+.2f")
                         } else if activeTab == 1 {
                             darkroomSlider(title: "Cream Sky (Split High)", value: $params.splitHighWarmth, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                             darkroomSlider(title: "Shadow Tone (Teal/Warm)", value: $params.splitShadowTint, range: -1.0...1.0, format: "%+.2f")
-                            darkroomSlider(title: "Shadows Lift / Deep", value: $params.shadows, range: -0.6...0.6, format: "%+.2f")
-                            darkroomSlider(title: "Highlights Protect", value: $params.highlights, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Shadows Recovery", value: $params.shadows, range: -0.5...0.6, format: "%+.2f")
+                            darkroomSlider(title: "Highlights Compress", value: $params.highlights, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                             darkroomSlider(title: "Matte Fade Lift", value: $params.fadeMatte, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                         } else if activeTab == 2 {
-                            darkroomSlider(title: "Foliage Density (Dark)", value: $params.foliageDensity, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                            darkroomSlider(title: "Foliage Hue (Pine)", value: $params.foliageHue, range: -1.0...1.0, format: "%+.2f")
+                            darkroomSlider(title: "Foliage Density (Pine)", value: $params.foliageDensity, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Foliage Hue (Cool/Warm)", value: $params.foliageHue, range: -1.0...1.0, format: "%+.2f")
                             darkroomSlider(title: "Saturation (Organic)", value: $params.saturation, range: -1.0...0.5, format: "%+.2f")
                             darkroomSlider(title: "Warmth (WB)", value: $params.warmth, range: -1.0...1.0, format: "%+.2f")
                             darkroomSlider(title: "Blue Trim (Sky)", value: $params.blueTrim, range: -0.5...0.5, format: "%+.2f")
@@ -2267,7 +2239,7 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 8. Interfaz Principal oCam (Con Panel Visual de Íconos + Modo Sencillo/PRO)
+// MARK: - 8. Interfaz Principal oCam
 enum QuickToolItem: String, CaseIterable, Identifiable {
     case timer = "Timer"
     case night = "Noche"
@@ -2337,10 +2309,10 @@ struct GridOverlayView: View {
 
 struct ContentView: View {
     @State private var camera = CameraManager()
-    @State private var showTray = false             // Cajón de ajustes de imagen (Simple / PRO)
-    @State private var showToolsSheet = false       // NUEVO: Panel visual de herramientas con íconos y deslizadores
+    @State private var showTray = false
+    @State private var showToolsSheet = false
     @State private var selectedTool: QuickToolItem = .timer
-    @State private var isProDrawerMode = false      // Inicia en Modo Sencillo por defecto
+    @State private var isProDrawerMode = false
     @State private var showExposureBar = false
     @State private var activeDrawerTab: Int = 0
     @State private var showFullPreview = false
@@ -2415,7 +2387,6 @@ struct ContentView: View {
                     .clipShape(Capsule())
             }
             
-            // Botón Rápido DUAL (Normal + Filtro a la vez)
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 camera.dualCaptureEnabled.toggle()
@@ -2448,7 +2419,6 @@ struct ContentView: View {
             
             Spacer(minLength: 2)
             
-            // Al tocar el logo central oCam puedes activar/desactivar todos los filtros al instante
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 camera.filtersEnabled.toggle()
@@ -2497,7 +2467,6 @@ struct ContentView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
             }
             
-            // Botón del Nuevo Panel Visual de Herramientas (Con íconos y deslizadores dedicados)
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
@@ -2508,11 +2477,8 @@ struct ContentView: View {
                     }
                 }
             } label: {
-                Image(systemName: " dial.low.fill")
-                    .overlay(
-                        Image(systemName: "slider.horizontal.2.square")
-                            .font(.system(size: 14, weight: .semibold))
-                    )
+                Image(systemName: "slider.horizontal.2.square")
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(showToolsSheet || hasExtraFeaturesActive ? .black : .white)
                     .frame(width: 32, height: 32)
                     .background(showToolsSheet || hasExtraFeaturesActive ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
@@ -2521,7 +2487,6 @@ struct ContentView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: camera.uiRotationDegrees)
             }
             
-            // Botón Chevron para desplegar los Ajustes de Imagen (Simple / PRO)
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
@@ -2562,8 +2527,8 @@ struct ContentView: View {
                     NativeCameraPreview(session: camera.session) { devicePt, viewPt in
                         camera.focusAt(normalizedPoint: devicePt, viewPoint: viewPt)
                     }
-                    .contrast(!camera.filtersEnabled || camera.selectedProfile == .normalClean ? 1.0 : (1.04 + Double(camera.params.contrastSCurve) * 0.16))
-                    .saturation(!camera.filtersEnabled || camera.selectedProfile == .normalClean ? 1.0 : max(0.0, 1.0 + Double(camera.params.saturation) * 0.65))
+                    .contrast(!camera.filtersEnabled || camera.selectedProfile == .normalClean ? 1.0 : (1.04 + Double(camera.params.contrastSCurve) * 0.14))
+                    .saturation(!camera.filtersEnabled || camera.selectedProfile == .normalClean ? 1.0 : max(0.0, 1.0 + Double(camera.params.saturation) * 0.60))
                     
                     LiveOpticalEffectsView(
                         profile: camera.selectedProfile,
@@ -2636,11 +2601,11 @@ struct ContentView: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white.opacity(0.7))
                             Slider(value: Binding(
-                                get: { camera.params.ev },
-                                set: { camera.setExposure($0) }
-                            ), in: -2.0...1.5)
+                                get: { camera.params.cameraBiasEV },
+                                set: { camera.setCameraExposureBias($0) }
+                            ), in: -1.5...1.5)
                             .tint(camera.selectedProfile.badgeColor)
-                            Text(String(format: "%+.1f EV", camera.params.ev))
+                            Text(String(format: "%+.1f EV", camera.params.cameraBiasEV))
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
@@ -2655,12 +2620,10 @@ struct ContentView: View {
                         .padding(.horizontal, 28)
                     }
                     
-                    // NUEVO PANEL VISUAL DE HERRAMIENTAS DE CÁMARA (Con íconos y su propio deslizador interactivo)
                     if showToolsSheet {
                         interactiveToolsPanelView
                     }
                     
-                    // CAJÓN DE AJUSTES DE COLOR (Con modo SIMPLE de 4 sliders y modo PRO de 22 sliders)
                     if showTray {
                         controlsDrawerView
                     }
@@ -2694,10 +2657,8 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Nuevo Panel Visual de Herramientas (Estilo iOS Camera / Fototeca con Íconos + Controles Dedicados)
     private var interactiveToolsPanelView: some View {
         VStack(spacing: 12) {
-            // Fila de Íconos Circulares Interactivos
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(QuickToolItem.allCases) { tool in
@@ -2735,7 +2696,6 @@ struct ContentView: View {
             
             Divider().background(Color.white.opacity(0.15))
             
-            // Control / Deslizador Dedicado para la Herramienta Seleccionada
             Group {
                 switch selectedTool {
                 case .timer:
@@ -2962,10 +2922,8 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Cajón de Ajustes de Color con Selector SIMPLE | PRO
     private var controlsDrawerView: some View {
         VStack(spacing: 8) {
-            // Cabecera del Cajón: Selector SIMPLE | PRO + Botón Reset
             HStack(spacing: 6) {
                 HStack(spacing: 0) {
                     Button {
@@ -3035,39 +2993,37 @@ struct ContentView: View {
             }
             
             if !isProDrawerMode {
-                // MODO SENCILLO: Solo los 4 controles esenciales a simple vista
-                glassSliderRow(title: "EXPOSICIÓN", value: Binding(
-                    get: { camera.params.ev },
-                    set: { camera.setExposure($0) }
-                ), range: -2.0...1.0, text: String(format: "%+.1f EV", camera.params.ev))
+                glassSliderRow(title: "SOMBRAS", value: $camera.params.shadowDepth, range: 0.0...1.0, text: "\(Int(camera.params.shadowDepth * 100))%")
+                
+                glassSliderRow(title: "LUZ CIELO", value: $camera.params.highlightBrilliance, range: 0.0...1.0, text: "\(Int(camera.params.highlightBrilliance * 100))%")
                 
                 glassSliderRow(title: "FUERZA LOOK", value: Binding(
                     get: { camera.simpleMacroIntensity },
                     set: { camera.applySimpleIntensity($0) }
                 ), range: 0.0...1.2, text: "\(Int(camera.simpleMacroIntensity * 100))%")
                 
-                glassSliderRow(title: "CALIDEZ WB", value: $camera.params.warmth, range: -1.0...1.0, text: String(format: "%+.1f", camera.params.warmth))
-                
-                glassSliderRow(title: "GRANO 35MM", value: $camera.params.grain, range: 0.0...1.0, text: "\(Int(camera.params.grain * 100))%")
+                glassSliderRow(title: "EXPOSICIÓN", value: Binding(
+                    get: { camera.params.cameraBiasEV },
+                    set: { camera.setCameraExposureBias($0) }
+                ), range: -1.5...1.5, text: String(format: "%+.1f EV", camera.params.cameraBiasEV))
             } else {
-                // MODO PRO: Todos los 22 Controles en 5 Pestañas
                 if activeDrawerTab == 0 {
-                    glassSliderRow(title: "EXPOSICIÓN", value: Binding(
-                        get: { camera.params.ev },
-                        set: { camera.setExposure($0) }
-                    ), range: -2.0...1.0, text: String(format: "%+.1f EV", camera.params.ev))
+                    glassSliderRow(title: "SOMBRAS", value: $camera.params.shadowDepth, range: 0.0...1.0, text: "\(Int(camera.params.shadowDepth * 100))%")
                     
-                    glassSliderRow(title: "DENSIDAD", value: $camera.params.filmDensity, range: 0.0...1.0, text: "\(Int(camera.params.filmDensity * 100))%")
+                    glassSliderRow(title: "LUZ CIELO", value: $camera.params.highlightBrilliance, range: 0.0...1.0, text: "\(Int(camera.params.highlightBrilliance * 100))%")
                     
                     glassSliderRow(title: "S-CURVE", value: $camera.params.contrastSCurve, range: 0.0...1.0, text: String(format: "%.2f", camera.params.contrastSCurve * 4.0))
                     
-                    glassSliderRow(title: "SKY COMP", value: $camera.params.skyCompression, range: 0.0...1.0, text: "\(Int(camera.params.skyCompression * 100))%")
+                    glassSliderRow(title: "EXPOSICIÓN", value: Binding(
+                        get: { camera.params.cameraBiasEV },
+                        set: { camera.setCameraExposureBias($0) }
+                    ), range: -1.5...1.5, text: String(format: "%+.1f EV", camera.params.cameraBiasEV))
                 } else if activeDrawerTab == 1 {
                     glassSliderRow(title: "CREAM SKY", value: $camera.params.splitHighWarmth, range: 0.0...1.0, text: "\(Int(camera.params.splitHighWarmth * 100))%")
                     
                     glassSliderRow(title: "SHAD TONE", value: $camera.params.splitShadowTint, range: -1.0...1.0, text: String(format: "%+.2f", camera.params.splitShadowTint))
                     
-                    glassSliderRow(title: "BLACK CRUSH", value: $camera.params.blackCrush, range: 0.0...1.0, text: "\(Int(camera.params.blackCrush * 100))%")
+                    glassSliderRow(title: "PIVOT", value: $camera.params.curvePivot, range: 0.42...0.60, text: String(format: "%.2f", camera.params.curvePivot))
                     
                     glassSliderRow(title: "MATTE FADE", value: $camera.params.fadeMatte, range: 0.0...1.0, text: "\(Int(camera.params.fadeMatte * 100))%")
                 } else if activeDrawerTab == 2 {
