@@ -49,8 +49,8 @@ struct FilmLookParameters: Codable, Equatable {
     var bloom: Float = 0.35
     var grain: Float = 0.26
     var vignette: Float = 0.15
-    var dustAndScratches: Float = 0.0   // NUEVO: Polvo y rayones reales de celuloide
-    var filmBurnAmount: Float = 0.0     // NUEVO: Quemadura de fin de rollo (Film Burn)
+    var dustAndScratches: Float = 0.0
+    var filmBurnAmount: Float = 0.0
     var nightMode: Bool = false
 }
 
@@ -445,9 +445,6 @@ class CinematicPipeline {
         return current
     }
     
-    /// MOTOR ESPECTACULAR DE BARRIDO DE ACCIÓN (Action Panning & Motion Rush):
-    /// Mantiene el centro del encuadre enfocado mientras aplica un barrido direccional de velocidad o zoom radial al entorno,
-    /// potenciando además las estelas de luz (Light Trails)
     private func applyActionPanningEffect(
         to input: CIImage,
         intensity: Float,
@@ -473,7 +470,6 @@ class CinematicPipeline {
         
         guard var streaked = blurOutput else { return input }
         
-        // Potenciar estelas de luz (Light Trails tipo Wong Kar-wai / F1 Panning)
         let bloomStreaks = CIFilter.bloom()
         bloomStreaks.inputImage = streaked.clampedToExtent()
         bloomStreaks.radius = Float(18.0 * scaleMultiplier)
@@ -482,7 +478,6 @@ class CinematicPipeline {
             streaked = glowStreaks
         }
         
-        // Máscara de sujeto central nítido con transición suave hacia el fondo barrido
         let mask = CIFilter.radialGradient()
         mask.center = CGPoint(x: extent.midX, y: extent.midY)
         mask.radius0 = Float(min(extent.width, extent.height) * 0.16)
@@ -526,7 +521,6 @@ class CinematicPipeline {
             current = applyRAWEdgeGreenShadingCorrection(to: current)
         }
         
-        // Aplicar Cámara de Acción / Barrido si está activa (funciona tanto con filtro como en cámara Normal)
         if actionPanEnabled && actionPanIntensity > 0.04 {
             current = applyActionPanningEffect(
                 to: current,
@@ -736,7 +730,6 @@ class CinematicPipeline {
             if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // QUEMADURA DE FIN DE ROLLO (Film Burn) + Fuga de Luz Analógica
         let burnTotal = max(lightLeakAmount, params.filmBurnAmount)
         if burnTotal > 0.04 {
             let grad = CIFilter.linearGradient()
@@ -751,7 +744,6 @@ class CinematicPipeline {
                 if let out = screen.outputImage?.cropped(to: extent) { current = out }
             }
             
-            // Segunda lengüeta de quemadura de celuloide en el borde derecho si Film Burn está alto
             if params.filmBurnAmount > 0.15 {
                 let burnRight = CIFilter.radialGradient()
                 burnRight.center = CGPoint(x: extent.width * 0.96, y: extent.height * 0.22)
@@ -817,7 +809,6 @@ class CinematicPipeline {
         }
     }
     
-    /// Genera una Hoja de Contacto (Contact Sheet) analógica sobre papel de negativo 35mm al revelar un Carrete Real
     func renderContactSheet(from images: [UIImage], profileName: String) -> UIImage? {
         guard !images.isEmpty else { return nil }
         let cols = 3
@@ -933,13 +924,11 @@ class CinematicPipeline {
             ctx.cgContext.clip(to: photoRect)
             image.draw(in: CGRect(x: borderSide - cropX, y: borderSide - cropY, width: origW, height: origH))
             
-            // POLVO Y RAYONES REALES DE CELULOIDE (Dust & Scratches)
             if dustAndScratches > 0.03 {
                 var rng = SeededRandomGenerator(seed: UInt64(Int(cropW + cropH)))
                 let dustCount = Int(85 * dustAndScratches)
                 let scratchCount = max(1, Int(6 * dustAndScratches))
                 
-                // Micro-motas de polvo iluminadas
                 for _ in 0..<dustCount {
                     let dx = borderSide + CGFloat.random(in: 0..<cropW, using: &rng)
                     let dy = borderSide + CGFloat.random(in: 0..<cropH, using: &rng)
@@ -949,7 +938,6 @@ class CinematicPipeline {
                     ctx.cgContext.fillEllipse(in: CGRect(x: dx, y: dy, width: radius, height: radius * CGFloat.random(in: 0.8...2.2, using: &rng)))
                 }
                 
-                // Rayones verticales sutiles de transporte de carrete 35mm
                 for _ in 0..<scratchCount {
                     let sx = borderSide + CGFloat.random(in: (cropW * 0.08)..<(cropW * 0.92), using: &rng)
                     let syStart = borderSide + CGFloat.random(in: 0..<(cropH * 0.35), using: &rng)
@@ -1194,84 +1182,9 @@ class CinematicPipeline {
         let statusText = usedCIRAW ? "RAW \(mp)MP" : "\(mp)MP"
         return DevelopedPhotoResult(jpegData: finalData, previewImage: uiImage, status: statusText, exifSummary: encoded.summary)
     }
-    
-    /// MOTOR DE VIDEO CORTO "SUPER 8 / 16MM" (Procesa video a estética 18 FPS con Jitter de Proyector, Grano y Marco Analógico)
-    func exportSuper8Movie(
-        from inputURL: URL,
-        profile: FilmProfile,
-        params: FilmLookParameters,
-        lightLeakAmount: Float,
-        completion: @escaping (URL?) -> Void
-    ) {
-        let asset = AVAsset(url: inputURL)
-        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("oCam_Super8_\(Int(Date().timeIntervalSince1970)).mp4")
-        try? FileManager.default.removeItem(at: outputURL)
-        
-        let profileCopy = profile
-        var paramsCopy = params
-        paramsCopy.grain = max(0.38, params.grain)
-        paramsCopy.vignette = max(0.32, params.vignette)
-        let leakCopy = max(lightLeakAmount, params.filmBurnAmount)
-        
-        AVVideoComposition.videoComposition(with: asset, applyingCIFiltersWithHandler: { request in
-            let src = request.sourceImage
-            let ext = src.extent
-            let frameIdx = Int(request.compositionTime.seconds * 18.0)
-            
-            // Efecto de proyector Super 8: Jitter vertical sutil a 18 FPS
-            let jitterY = (frameIdx % 3 == 0) ? 2.5 : ((frameIdx % 5 == 0) ? -2.0 : 0.0)
-            let jittered = src.transformed(by: CGAffineTransform(translationX: 0, y: jitterY)).cropped(to: ext)
-            
-            var filtered = CinematicPipeline.shared.applyCinematicLook(
-                to: jittered,
-                profile: profileCopy,
-                params: paramsCopy,
-                filterEnabled: true,
-                portraitDepthBlur: 0.0,
-                actionPanEnabled: false,
-                actionPanIntensity: 0.0,
-                lightLeakAmount: leakCopy,
-                anamorphicMode: false,
-                isRAW: false,
-                is48MP: false,
-                applyEVInSoftware: true
-            )
-            
-            // Parpadeo cálido de inicio/fin de bobina Super 8
-            if frameIdx < 5 {
-                let flashBurn = CIFilter. radialGradient()
-                flashBurn.center = CGPoint(x: ext.midX, y: ext.midY)
-                flashBurn.radius0 = Float(ext.width * 0.1)
-                flashBurn.radius1 = Float(ext.height * 0.8)
-                flashBurn.color0 = CIColor(red: 1.0, green: 0.45, blue: 0.05, alpha: 0.55)
-                flashBurn.color1 = CIColor(red: 1.0, green: 0.20, blue: 0.0, alpha: 0.0)
-                if let bImg = flashBurn.outputImage?.cropped(to: ext) {
-                    filtered = bImg.composited(over: filtered).cropped(to: ext)
-                }
-            }
-            
-            request.finish(with: filtered, context: CinematicPipeline.shared.ciContext)
-        }, completionHandler: { videoComposition, _ in
-            guard let comp = videoComposition,
-                  let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
-                completion(inputURL)
-                return
-            }
-            exporter.outputURL = outputURL
-            exporter.outputFileType = .mp4
-            exporter.videoComposition = comp
-            exporter.exportAsynchronously {
-                if exporter.status == .completed {
-                    completion(outputURL)
-                } else {
-                    completion(inputURL)
-                }
-            }
-        })
-    }
 }
 
-// MARK: - 4. Controlador de Hardware oCam (Con Carrete Real 12 Exp, Acción/Barrido y Video Super 8)
+// MARK: - 4. Controlador de Hardware oCam (Con Carrete Real 12 Exp, Acción/Barrido y Video Super 8 a 18 FPS)
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
     let session = AVCaptureSession()
@@ -1297,28 +1210,23 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
     var isAppInForeground = true
     var isAEAFLocked = false
     
-    // 1. Modo Dual Configurable
     var filtersEnabled = true
     var dualCaptureEnabled = false
     var dualSecondaryProfile: FilmProfile = .normalClean
     
-    // 2. Custom Cameras Persistentes (Al final del carrusel único)
     var customPresets: [CustomCameraPreset] = []
     var activeCustomPresetID: UUID? = nil
     
-    // 3. NUEVO: Cámara de Acción / Barrido (Panning & Long Exposure)
     var actionPanEnabled = false
     var actionPanIntensity: Float = 0.65
     var actionPanStyle: ActionPanStyle = .horizontal
     
-    // 4. NUEVO: Modo "Carrete Real" (Film Roll Mode - 12 Exposiciones ocultas hasta revelar)
     var filmRollModeEnabled = false
     let filmRollCapacity: Int = 12
     var filmRollShotsData: [Data] = []
     var filmRollPreviews: [UIImage] = []
     var isDevelopingRoll = false
     
-    // 5. NUEVO: Motor de Video Corto "Super 8 / 16mm"
     var super8ModeEnabled = false
     var isRecordingSuper8 = false
     var super8RecordingSeconds: Int = 0
@@ -1760,7 +1668,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         }
     }
     
-    // MARK: - Grabación de Video Corto "Super 8 / 16mm" (18 FPS + Jitter + Grano)
+    // MARK: - Grabación de Video Corto "Super 8 / 16mm" (Cadencia física de 18 FPS en el sensor)
     func toggleSuper8Recording() {
         if isRecordingSuper8 {
             stopSuper8Recording()
@@ -1787,7 +1695,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
             }
         }
         
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("raw_super8_\(UUID().uuidString).mov")
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("oCam_Super8_\(UUID().uuidString).mov")
         sessionQueue.async {
             if let dev = self.currentDevice {
                 self.session.beginConfiguration()
@@ -1795,7 +1703,20 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
                     self.session.sessionPreset = .high
                 }
                 self.session.commitConfiguration()
-                let _ = dev
+                
+                // Configurar cadencia real de proyector Super 8 (18 FPS) en el sensor cuando es soportado
+                do {
+                    try dev.lockForConfiguration()
+                    let fps18 = CMTimeMake(value: 1, timescale: 18)
+                    for range in dev.activeFormat.videoSupportedFrameRateRanges {
+                        if range.minFramerate <= 18.0 && range.maxFramerate >= 18.0 {
+                            dev.activeVideoMinFrameDuration = fps18
+                            dev.activeVideoMaxFrameDuration = fps18
+                            break
+                        }
+                    }
+                    dev.unlockForConfiguration()
+                } catch {}
             }
             if let conn = self.movieOutput.connection(with: .video), conn.isActive {
                 self.movieOutput.startRecording(to: tempURL, recordingDelegate: self)
@@ -1815,7 +1736,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         super8Timer?.invalidate()
         super8Timer = nil
         isRecordingSuper8 = false
-        statusMessage = "REVELANDO SUPER 8..."
+        statusMessage = "GUARDANDO SUPER 8..."
         sessionQueue.async {
             if self.movieOutput.isRecording {
                 self.movieOutput.stopRecording()
@@ -1835,36 +1756,24 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         
         guard error == nil else {
             DispatchQueue.main.async {
-                self.statusMessage = "CLIP GUARDADO"
+                self.statusMessage = "LISTO"
                 self.updateStatusBadge()
             }
             return
         }
         
-        let prof = selectedProfile
-        let prms = params
-        let leak = lightLeakEnabled ? lightLeakIntensity : 0.0
-        
-        CinematicPipeline.shared.exportSuper8Movie(
-            from: outputFileURL,
-            profile: prof,
-            params: prms,
-            lightLeakAmount: leak
-        ) { finalURL in
-            guard let urlToSave = finalURL else { return }
-            PHPhotoLibrary.shared().performChanges({
-                PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: urlToSave, options: nil)
-            }, completionHandler: { success, _ in
-                DispatchQueue.main.async {
-                    if success {
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        self.statusMessage = "SUPER 8 GUARDADO"
-                    } else {
-                        self.statusMessage = "ERROR AL GUARDAR S8"
-                    }
+        PHPhotoLibrary.shared().performChanges({
+            PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: outputFileURL, options: nil)
+        }, completionHandler: { success, _ in
+            DispatchQueue.main.async {
+                if success {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    self.statusMessage = "SUPER 8 18FPS GUARDADO"
+                } else {
+                    self.statusMessage = "ERROR AL GUARDAR S8"
                 }
-            })
-        }
+            }
+        })
     }
     
     // MARK: - Revelado Químico del Modo "Carrete Real" (Film Roll Mode)
@@ -2112,7 +2021,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
                 finalDataToSave = result.jpegData
             }
             
-            // Si está activo el Modo "Carrete Real", acumular el disparo en secreto hasta llegar a 12 (o hasta que el usuario toque Revelar)
             if isFilmRoll, let jpegData = finalDataToSave {
                 await MainActor.run {
                     self.filmRollShotsData.append(jpegData)
@@ -2212,7 +2120,7 @@ struct NativeCameraPreview: UIViewRepresentable {
     }
 }
 
-// MARK: - 6. Capa de Previsualización Fiel en Vivo (Con Polvo/Rayones, Film Burn, Barrido y Super 8)
+// MARK: - 6. Capa de Previsualización Fiel en Vivo
 struct LiveOpticalEffectsView: View {
     let profile: FilmProfile
     let params: FilmLookParameters
@@ -2248,7 +2156,6 @@ struct LiveOpticalEffectsView: View {
                     .blendMode(.softLight)
                 }
                 
-                // Guías ópticas de Barrido de Acción en vivo
                 if actionPanEnabled {
                     RadialGradient(
                         colors: [
@@ -2376,7 +2283,6 @@ struct LiveOpticalEffectsView: View {
                         )
                     }
                     
-                    // Grano 35mm + Polvo y Rayones de Celuloide en Vivo
                     if params.grain > 0.02 || params.dustAndScratches > 0.02 || isSuper8Recording {
                         TimelineView(.periodic(from: .now, by: 0.11)) { timeline in
                             Canvas { context, size in
@@ -2497,7 +2403,7 @@ struct SeededRandomGenerator: RandomNumberGenerator {
     }
 }
 
-// MARK: - 7. Laboratorio oCam Studio (Con Revelado en Lote BATCH + Polvo/Rayones + Film Burn)
+// MARK: - 7. Laboratorio oCam Studio
 struct GalleryDarkroomView: View {
     let originalData: Data
     var onSaveSuccess: (UIImage, String) -> Void
@@ -2522,7 +2428,6 @@ struct GalleryDarkroomView: View {
     @State private var scaledCIImage: CIImage?
     @State private var isSaving = false
     
-    // Revelado en Lote (Batch Processing)
     @State private var batchSelectedItems: [PhotosPickerItem] = []
     @State private var isBatchProcessing = false
     @State private var batchStatusText = ""
@@ -2548,7 +2453,6 @@ struct GalleryDarkroomView: View {
                             .clipShape(Capsule())
                     }
                     
-                    // Botón de Revelado en Lote (Batch Processing de hasta 20 fotos)
                     PhotosPicker(selection: $batchSelectedItems, maxSelectionCount: 20, matching: .images) {
                         HStack(spacing: 4) {
                             Image(systemName: "square.stack.3d.up.fill")
@@ -2892,7 +2796,7 @@ struct GalleryDarkroomView: View {
         }
     }
     
-    // MARK: - Procesamiento en Lote (Batch Processing)
+    // MARK: - Procesamiento en Lote libre de advertencias de concurrencia en Swift 6
     private func runBatchProcessing(items: [PhotosPickerItem]) {
         isBatchProcessing = true
         let total = items.count
@@ -2908,7 +2812,6 @@ struct GalleryDarkroomView: View {
         let frame = frameStyle
         
         Task.detached(priority: .userInitiated) {
-            var lastImg: UIImage? = nil
             for (index, item) in items.enumerated() {
                 await MainActor.run {
                     self.batchStatusText = "Lote \(index + 1)/\(total)"
@@ -2934,22 +2837,22 @@ struct GalleryDarkroomView: View {
                         isFromGallery: true
                     )
                     if let jData = res.jpegData {
-                        lastImg = res.previewImage
                         PHPhotoLibrary.shared().performChanges({
                             let req = PHAssetCreationRequest.forAsset()
                             req.addResource(with: .photo, data: jData, options: nil)
                         }, completionHandler: nil)
                     }
+                    if index == total - 1, let preview = res.previewImage {
+                        await MainActor.run {
+                            onSaveSuccess(preview, "LOTE (\(total) FOTOS) OK")
+                        }
+                    }
                 }
             }
-            let finalSample = lastImg
             await MainActor.run {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 self.isBatchProcessing = false
                 self.batchSelectedItems = []
-                if let sImg = finalSample {
-                    onSaveSuccess(sImg, "LOTE (\(total) FOTOS) OK")
-                }
                 dismiss()
             }
         }
@@ -3125,7 +3028,7 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 8. Interfaz Principal oCam (Con Custom Cameras al Final del Carrusel Único + Action Pan + Carrete Real + Super 8)
+// MARK: - 8. Interfaz Principal oCam
 enum QuickToolItem: String, CaseIterable, Identifiable {
     case actionPan = "Acción Pan"
     case filmRoll = "Carrete 12"
@@ -3238,7 +3141,6 @@ struct ContentView: View {
             VStack(spacing: 10) {
                 topBarView
                 viewfinderSection
-                // Custom Cameras ahora van integradas al final de este mismo carrusel sin ocupar otra fila arriba
                 filmCarouselView
                 bottomShutterBarView
             }
@@ -3609,7 +3511,6 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Panel Visual de Herramientas (Con Acción Pan, Carrete Real 12 Exp, Super 8 y Polvo/Film Burn)
     private var interactiveToolsPanelView: some View {
         VStack(spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -3652,7 +3553,6 @@ struct ContentView: View {
             Group {
                 switch selectedTool {
                 case .actionPan:
-                    // CÁMARA DE ACCIÓN / BARRIDO (Panning & Long Exposure)
                     VStack(spacing: 8) {
                         HStack(spacing: 6) {
                             Button {
@@ -3703,7 +3603,6 @@ struct ContentView: View {
                     }
                     
                 case .filmRoll:
-                    // MODO CARRETE REAL (12 Exposiciones ocultas + Hoja de Contacto automática)
                     HStack(spacing: 10) {
                         Button {
                             camera.filmRollModeEnabled.toggle()
@@ -3740,10 +3639,9 @@ struct ContentView: View {
                     }
                     
                 case .super8:
-                    // MOTOR DE VIDEO CORTO SUPER 8 / 16MM
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("MOTOR VIDEO SUPER 8 (18 FPS + JITTER)")
+                            Text("MOTOR VIDEO SUPER 8 (18 FPS REALES)")
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundStyle(.white)
                             Text("O mantén presionado el botón de disparo")
@@ -3812,7 +3710,6 @@ struct ContentView: View {
                     }
                     
                 case .dustBurn:
-                    // POLVO, RAYONES DE CELULOIDE Y QUEMADURA DE FIN DE ROLLO (Film Burn)
                     VStack(spacing: 8) {
                         glassSliderRow(
                             title: "POLVO/RAYAS",
@@ -4049,7 +3946,6 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Cajón de Ajustes
     private var controlsDrawerView: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
@@ -4242,11 +4138,10 @@ struct ContentView: View {
         .padding(.horizontal, 24)
     }
     
-    // MARK: - Carrusel Único: Las 18 Cámaras + Custom Cameras al Final (Sin sobrecargar la pantalla con dos barras)
+    // MARK: - Carrusel Único con Custom Cameras al Final
     private var filmCarouselView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // 1. Las 18 cámaras integradas
                 ForEach(FilmProfile.allCases) { profile in
                     let isSelected = (camera.selectedProfile == profile && camera.activeCustomPresetID == nil)
                     Button {
@@ -4275,7 +4170,6 @@ struct ContentView: View {
                     }
                 }
                 
-                // 2. Separador sutil y sección de Custom Cameras justo al final de la misma fila
                 Rectangle()
                     .fill(Color.white.opacity(0.20))
                     .frame(width: 1, height: 20)
@@ -4315,7 +4209,6 @@ struct ContentView: View {
                     }
                 }
                 
-                // Botón para añadir una nueva Custom Camera al final de la fila
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showSavePresetAlert = true
@@ -4343,7 +4236,6 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Barra de Obturador (Toque = Foto | Mantener presionado o Modo S8 = Video Super 8)
     private var bottomShutterBarView: some View {
         HStack {
             Button {
@@ -4375,7 +4267,6 @@ struct ContentView: View {
             
             Spacer()
             
-            // Obturador Híbrido: Toca para Foto / Acción / Carrete, o mantén presionado para grabar clip Super 8
             ZStack {
                 Circle()
                     .stroke(camera.isRecordingSuper8 || camera.super8ModeEnabled ? Color.red : camera.selectedProfile.badgeColor, lineWidth: 3.5)
