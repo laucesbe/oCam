@@ -19,7 +19,7 @@ struct oCamApp: App {
     }
 }
 
-// MARK: - 1. Parámetros Codificables del Motor Cinematográfico (Permite Guardar Custom Cameras)
+// MARK: - 1. Parámetros Codificables del Motor Cinematográfico
 struct FilmLookParameters: Codable, Equatable {
     var ev: Float = -0.25
     var cameraBiasEV: Float = -0.20
@@ -49,10 +49,11 @@ struct FilmLookParameters: Codable, Equatable {
     var bloom: Float = 0.35
     var grain: Float = 0.26
     var vignette: Float = 0.15
+    var dustAndScratches: Float = 0.0   // NUEVO: Polvo y rayones reales de celuloide
+    var filmBurnAmount: Float = 0.0     // NUEVO: Quemadura de fin de rollo (Film Burn)
     var nightMode: Bool = false
 }
 
-// Estructura para guardar Cámaras Personalizadas entre sesiones
 struct CustomCameraPreset: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var name: String
@@ -60,7 +61,21 @@ struct CustomCameraPreset: Codable, Identifiable, Equatable {
     var params: FilmLookParameters
 }
 
-// MARK: - 2. Catálogo de 18 Cámaras (Intactas oCam, oCam Bright, Normal, Nocturna y Palms 70s + 13 Recalibradas)
+enum ActionPanStyle: String, CaseIterable {
+    case horizontal = "Barrido Horiz."
+    case vertical = "Barrido Vert."
+    case radialZoom = "Rush Zoom"
+    
+    var angleRadians: Float {
+        switch self {
+        case .horizontal: return 0.0
+        case .vertical: return Float.pi / 2.0
+        case .radialZoom: return 0.0
+        }
+    }
+}
+
+// MARK: - 2. Catálogo de 18 Cámaras (Intactas oCam, oCam Bright, Normal, Nocturna y Palms 70s)
 enum FilmProfile: String, CaseIterable, Identifiable, Codable {
     case ocamMaster = "oCam"
     case ocamBright = "oCam Bright"
@@ -131,7 +146,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
     
     var recommended: FilmLookParameters {
         switch self {
-        // --- LAS 5 CÁMARAS INTACTAS QUE PEDISTE NO TOCAR ---
         case .ocamMaster:
             return FilmLookParameters(
                 ev: -0.28, cameraBiasEV: -0.25, filmDensity: 0.42, shadowDepth: 0.0, highlightBrilliance: 0.0,
@@ -187,10 +201,7 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 redTrim: 0.10, greenTrim: -0.06, blueTrim: 0.08,
                 softMist: 0.45, bloom: 0.90, grain: 0.35, vignette: 0.34, nightMode: true
             )
-            
-        // --- LAS 13 CÁMARAS RECALIBRADAS CON PERSONALIDAD EXTREMA Y DISTINTIVA ---
         case .kodak2383:
-            // Look Hollywood Blockbuster: Sombras fuertemente Teal/Petróleo y pieles/luces doradas con alto contraste de sala de cine
             return FilmLookParameters(
                 ev: -0.32, cameraBiasEV: -0.28, filmDensity: 0.55, shadowDepth: 0.45, highlightBrilliance: 0.30,
                 contrastSCurve: 0.92, curvePivot: 0.60, skyCompression: 0.50,
@@ -202,7 +213,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.25, bloom: 0.50, grain: 0.28, vignette: 0.32, nightMode: false
             )
         case .portra400:
-            // Kodak Portra 400 Auténtico: Luminoso, aireado, tonos piel cálidos melocotón, sombras abiertas sin empastar
             return FilmLookParameters(
                 ev: 0.05, cameraBiasEV: -0.10, filmDensity: 0.18, shadowDepth: 0.10, highlightBrilliance: 0.55,
                 contrastSCurve: 0.46, curvePivot: 0.66, skyCompression: 0.42,
@@ -214,7 +224,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.30, bloom: 0.40, grain: 0.20, vignette: 0.10, nightMode: false
             )
         case .cinestill800T:
-            // Película de Tungsteno 3200K: Azul frío eléctrico nocturno con fuertes halos rojos/naranjas en las luces
             return FilmLookParameters(
                 ev: -0.38, cameraBiasEV: -0.35, filmDensity: 0.46, shadowDepth: 0.35, highlightBrilliance: 0.35,
                 contrastSCurve: 0.76, curvePivot: 0.58, skyCompression: 0.35,
@@ -226,7 +235,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.50, bloom: 1.00, grain: 0.38, vignette: 0.30, nightMode: true
             )
         case .dispo98:
-            // Cámara Desechable Fuji Quicksnap 1998: Negros muy levantados con neblina verdosa, grano grueso y viñeta de lente plástico
             return FilmLookParameters(
                 ev: -0.18, cameraBiasEV: -0.15, filmDensity: 0.35, shadowDepth: 0.15, highlightBrilliance: 0.40,
                 contrastSCurve: 0.82, curvePivot: 0.60, skyCompression: 0.58,
@@ -235,10 +243,10 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 foliageHue: -0.40, foliageDensity: 0.50, skyHue: -0.35,
                 splitHighWarmth: 0.50, splitShadowTint: -0.55,
                 redTrim: -0.06, greenTrim: 0.24, blueTrim: -0.18,
-                softMist: 0.38, bloom: 0.55, grain: 0.65, vignette: 0.52, nightMode: false
+                softMist: 0.38, bloom: 0.55, grain: 0.65, vignette: 0.52,
+                dustAndScratches: 0.35, filmBurnAmount: 0.20, nightMode: false
             )
         case .ccd2004:
-            // Cyber-shot / Digicam 2004: Cero mate fade, negros duros digitales, saturación alta y cianes/magentas vibrantes
             return FilmLookParameters(
                 ev: -0.20, cameraBiasEV: -0.20, filmDensity: 0.22, shadowDepth: 0.40, highlightBrilliance: 0.25,
                 contrastSCurve: 0.84, curvePivot: 0.50, skyCompression: 0.05,
@@ -250,7 +258,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.0, bloom: 0.10, grain: 0.12, vignette: 0.18, nightMode: false
             )
         case .polaroid600:
-            // Polaroid 600 Instantánea: Tono crema amarillento vintage fuerte, sombras desvanecidas suaves y halo de difusión
             return FilmLookParameters(
                 ev: -0.15, cameraBiasEV: -0.15, filmDensity: 0.40, shadowDepth: 0.10, highlightBrilliance: 0.50,
                 contrastSCurve: 0.52, curvePivot: 0.68, skyCompression: 0.75,
@@ -259,10 +266,10 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 foliageHue: -0.50, foliageDensity: 0.60, skyHue: -0.55,
                 splitHighWarmth: 0.85, splitShadowTint: 0.45,
                 redTrim: 0.18, greenTrim: 0.08, blueTrim: -0.32,
-                softMist: 0.55, bloom: 0.65, grain: 0.30, vignette: 0.42, nightMode: false
+                softMist: 0.55, bloom: 0.65, grain: 0.30, vignette: 0.42,
+                dustAndScratches: 0.25, filmBurnAmount: 0.15, nightMode: false
             )
         case .superia400:
-            // Fujifilm Superia X-Tra 400: Cuarta capa de color cian -> Verdes esmeralda intensos y sombras con tinte magenta/violeta
             return FilmLookParameters(
                 ev: -0.28, cameraBiasEV: -0.25, filmDensity: 0.44, shadowDepth: 0.35, highlightBrilliance: 0.35,
                 contrastSCurve: 0.74, curvePivot: 0.60, skyCompression: 0.35,
@@ -274,7 +281,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.18, bloom: 0.32, grain: 0.32, vignette: 0.26, nightMode: false
             )
         case .velvia50:
-            // Fujichrome Velvia 50: Diapositiva de paisaje extrema -> Saturación profunda, negros densos y rojos/verdes vibrantes
             return FilmLookParameters(
                 ev: -0.38, cameraBiasEV: -0.35, filmDensity: 0.56, shadowDepth: 0.65, highlightBrilliance: 0.40,
                 contrastSCurve: 0.94, curvePivot: 0.54, skyCompression: 0.20,
@@ -286,7 +292,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.08, bloom: 0.25, grain: 0.14, vignette: 0.32, nightMode: false
             )
         case .gold200:
-            // Kodak Gold 200: Baño dorado cálido de verano, amarillos/rojos intensos y sombras color caramelo tostado
             return FilmLookParameters(
                 ev: -0.20, cameraBiasEV: -0.20, filmDensity: 0.36, shadowDepth: 0.30, highlightBrilliance: 0.55,
                 contrastSCurve: 0.68, curvePivot: 0.64, skyCompression: 0.48,
@@ -298,7 +303,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.32, bloom: 0.48, grain: 0.28, vignette: 0.24, nightMode: false
             )
         case .aerochrome:
-            // Kodak Aerochrome IV Infrarrojo: Transforma dramáticamente las hojas verdes en rojo carmesí/magenta con cielo cian oscuro
             return FilmLookParameters(
                 ev: -0.30, cameraBiasEV: -0.25, filmDensity: 0.48, shadowDepth: 0.45, highlightBrilliance: 0.40,
                 contrastSCurve: 0.80, curvePivot: 0.58, skyCompression: 0.30,
@@ -310,7 +314,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.25, bloom: 0.45, grain: 0.28, vignette: 0.26, nightMode: false
             )
         case .bleachBypass:
-            // Proceso químico de omisión de blanqueo (Se7en / Saving Private Ryan): Plata retenida, casi sin color y contraste metálico brutal
             return FilmLookParameters(
                 ev: -0.42, cameraBiasEV: -0.35, filmDensity: 0.65, shadowDepth: 0.75, highlightBrilliance: 0.45,
                 contrastSCurve: 0.96, curvePivot: 0.56, skyCompression: 0.50,
@@ -319,10 +322,10 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 foliageHue: -0.50, foliageDensity: 0.65, skyHue: -0.40,
                 splitHighWarmth: 0.20, splitShadowTint: -0.45,
                 redTrim: -0.05, greenTrim: 0.0, blueTrim: -0.08,
-                softMist: 0.15, bloom: 0.20, grain: 0.52, vignette: 0.45, nightMode: false
+                softMist: 0.15, bloom: 0.20, grain: 0.52, vignette: 0.45,
+                dustAndScratches: 0.30, nightMode: false
             )
         case .ilfordHP5:
-            // Ilford HP5 Plus 400: Blanco y negro periodístico británico con amplísima latitud de grises medios y negros suaves
             return FilmLookParameters(
                 ev: -0.18, cameraBiasEV: -0.15, filmDensity: 0.32, shadowDepth: 0.20, highlightBrilliance: 0.45,
                 contrastSCurve: 0.50, curvePivot: 0.62, skyCompression: 0.42,
@@ -334,7 +337,6 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 softMist: 0.22, bloom: 0.28, grain: 0.46, vignette: 0.22, nightMode: false
             )
         case .triX400:
-            // Kodak Tri-X 400 Pushed: Blanco y negro callejero de alto contraste, negros profundos de carbón y grano marcado
             return FilmLookParameters(
                 ev: -0.38, cameraBiasEV: -0.35, filmDensity: 0.62, shadowDepth: 0.78, highlightBrilliance: 0.55,
                 contrastSCurve: 0.94, curvePivot: 0.54, skyCompression: 0.22,
@@ -343,7 +345,8 @@ enum FilmProfile: String, CaseIterable, Identifiable, Codable {
                 foliageHue: 0.0, foliageDensity: 0.55, skyHue: 0.0,
                 splitHighWarmth: 0.0, splitShadowTint: 0.0,
                 redTrim: 0.0, greenTrim: 0.0, blueTrim: 0.0,
-                softMist: 0.12, bloom: 0.24, grain: 0.68, vignette: 0.40, nightMode: false
+                softMist: 0.12, bloom: 0.24, grain: 0.68, vignette: 0.40,
+                dustAndScratches: 0.25, nightMode: false
             )
         }
     }
@@ -388,7 +391,7 @@ struct DevelopedPhotoResult {
     let exifSummary: String
 }
 
-// MARK: - 3. Motor Polinómico de Emulsión + Corrección Radial Anti-Verde en Bordes RAW
+// MARK: - 3. Motor Polinómico + Barrido de Acción (Action Pan) + Polvo/Rayones + Film Burn
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
@@ -399,19 +402,16 @@ class CinematicPipeline {
         .priorityRequestLow: false
     ])
     
-    /// Corrige específicamente el "Color Shading" (viñeteado verdoso en los bordes y parte baja del sensor en modo Bayer RAW)
     private func applyRAWEdgeGreenShadingCorrection(to input: CIImage) -> CIImage {
         var current = input
         let extent = current.extent
         
-        // 1. Neutralización global de matriz Bayer RGGB
         let rawTintFix = CIFilter.temperatureAndTint()
         rawTintFix.inputImage = current
         rawTintFix.neutral = CIVector(x: 6500, y: 0)
         rawTintFix.targetNeutral = CIVector(x: 6350, y: 24)
         if let out = rawTintFix.outputImage?.cropped(to: extent) { current = out }
         
-        // 2. Versión con compensación anti-verde para los bordes/esquinas del lente (donde el sensor pierde rojo/azul y deja halo verde)
         let edgeCorrected = current.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 1.14, y: 0.04, z: 0.00, w: 0),
             "inputGVector": CIVector(x: -0.03, y: 0.84, z: -0.02, w: 0),
@@ -419,7 +419,6 @@ class CinematicPipeline {
             "inputBiasVector": CIVector(x: 0.006, y: -0.012, z: 0.006, w: 0)
         ]).cropped(to: extent)
         
-        // 3. Máscara radial suave: 0% en el centro (mantiene el centro intacto) y 100% hacia los bordes/esquinas (elimina el borde verde)
         let radialMask = CIFilter.radialGradient()
         radialMask.center = CGPoint(x: extent.midX, y: extent.midY)
         radialMask.radius0 = Float(min(extent.width, extent.height) * 0.28)
@@ -446,12 +445,72 @@ class CinematicPipeline {
         return current
     }
     
+    /// MOTOR ESPECTACULAR DE BARRIDO DE ACCIÓN (Action Panning & Motion Rush):
+    /// Mantiene el centro del encuadre enfocado mientras aplica un barrido direccional de velocidad o zoom radial al entorno,
+    /// potenciando además las estelas de luz (Light Trails)
+    private func applyActionPanningEffect(
+        to input: CIImage,
+        intensity: Float,
+        style: ActionPanStyle,
+        scaleMultiplier: CGFloat
+    ) -> CIImage {
+        let extent = input.extent
+        let clamped = input.clampedToExtent()
+        let blurOutput: CIImage?
+        
+        if style == .radialZoom {
+            blurOutput = clamped.applyingFilter("CIZoomBlur", parameters: [
+                kCIInputCenterKey: CIVector(x: extent.midX, y: extent.midY),
+                "inputAmount": NSNumber(value: Float(24.0 * Double(intensity) * scaleMultiplier))
+            ]).cropped(to: extent)
+        } else {
+            let motion = CIFilter.motionBlur()
+            motion.inputImage = clamped
+            motion.angle = style.angleRadians
+            motion.radius = Float(38.0 * Double(intensity) * scaleMultiplier)
+            blurOutput = motion.outputImage?.cropped(to: extent)
+        }
+        
+        guard var streaked = blurOutput else { return input }
+        
+        // Potenciar estelas de luz (Light Trails tipo Wong Kar-wai / F1 Panning)
+        let bloomStreaks = CIFilter.bloom()
+        bloomStreaks.inputImage = streaked.clampedToExtent()
+        bloomStreaks.radius = Float(18.0 * scaleMultiplier)
+        bloomStreaks.intensity = intensity * 0.45
+        if let glowStreaks = bloomStreaks.outputImage?.cropped(to: extent) {
+            streaked = glowStreaks
+        }
+        
+        // Máscara de sujeto central nítido con transición suave hacia el fondo barrido
+        let mask = CIFilter.radialGradient()
+        mask.center = CGPoint(x: extent.midX, y: extent.midY)
+        mask.radius0 = Float(min(extent.width, extent.height) * 0.16)
+        mask.radius1 = Float(max(extent.width, extent.height) * 0.54)
+        mask.color0 = CIColor(red: 0, green: 0, blue: 0, alpha: 0)
+        mask.color1 = CIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        
+        if let maskImg = mask.outputImage?.cropped(to: extent) {
+            let blend = CIFilter.blendWithMask()
+            blend.inputImage = streaked
+            blend.backgroundImage = input
+            blend.maskImage = maskImg
+            if let out = blend.outputImage?.cropped(to: extent) {
+                return out
+            }
+        }
+        return streaked
+    }
+    
     func applyCinematicLook(
         to input: CIImage,
         profile: FilmProfile,
         params: FilmLookParameters,
         filterEnabled: Bool = true,
         portraitDepthBlur: Float = 0.0,
+        actionPanEnabled: Bool = false,
+        actionPanIntensity: Float = 0.65,
+        actionPanStyle: ActionPanStyle = .horizontal,
         lightLeakAmount: Float = 0.0,
         anamorphicMode: Bool = false,
         isRAW: Bool,
@@ -461,13 +520,22 @@ class CinematicPipeline {
         var current = input
         let extent = current.extent
         guard extent.width > 0, extent.height > 0 else { return input }
+        let scaleMultiplier = max(1.0, min(extent.width, extent.height) / 1080.0)
         
-        // 1. Si viene de Bayer RAW, aplicar la corrección periférica anti-borde verde (NUNCA toca 48MP ni 12MP normal)
         if isRAW {
             current = applyRAWEdgeGreenShadingCorrection(to: current)
         }
         
-        // 2. Si el usuario desactivó los filtros o está en la cámara "Normal", permitir igualmente que funcionen sus ajustes manuales de R-G-B y WB
+        // Aplicar Cámara de Acción / Barrido si está activa (funciona tanto con filtro como en cámara Normal)
+        if actionPanEnabled && actionPanIntensity > 0.04 {
+            current = applyActionPanningEffect(
+                to: current,
+                intensity: actionPanIntensity,
+                style: actionPanStyle,
+                scaleMultiplier: scaleMultiplier
+            )
+        }
+        
         if !filterEnabled || profile == .normalClean {
             if abs(params.redTrim) > 0.01 || abs(params.greenTrim) > 0.01 || abs(params.blueTrim) > 0.01 {
                 let rgbNormal = CIFilter.colorMatrix()
@@ -487,9 +555,6 @@ class CinematicPipeline {
             return current
         }
         
-        let scaleMultiplier = max(1.0, min(extent.width, extent.height) / 1080.0)
-        
-        // 3. Exposición y Densidad de Película (Intacto para Palms 70s, oCam, oCam Bright y Nocturna)
         let effectiveEV = (applyEVInSoftware ? params.ev : (params.ev * 0.35)) - (params.filmDensity * 0.32)
         if abs(effectiveEV) > 0.01 {
             let exp = CIFilter.exposureAdjust()
@@ -498,7 +563,6 @@ class CinematicPipeline {
             if let out = exp.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 4. Temperatura (WB) y Matiz (Tint)
         if abs(params.warmth) > 0.01 || abs(params.tint) > 0.01 {
             let wbFix = CIFilter.temperatureAndTint()
             wbFix.inputImage = current
@@ -509,7 +573,6 @@ class CinematicPipeline {
             if let out = wbFix.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 5. Compresión de Altas Luces y Control de Sombras
         let hs = CIFilter.highlightShadowAdjust()
         hs.inputImage = current
         let hlTarget = max(0.15, min(1.0, 0.55 - (params.highlights * 0.45) + (params.highlightBrilliance * 0.40)))
@@ -519,7 +582,6 @@ class CinematicPipeline {
         hs.radius = Float(30.0 * scaleMultiplier)
         if let out = hs.outputImage?.cropped(to: extent) { current = out }
         
-        // 6. MATRICES QUÍMICAS DISTINTIVAS POR CÁMARA (Sin tocar oCam, oCam Bright, Normal, Nocturna ni Palms 70s)
         if profile == .aerochrome {
             let aero = CIFilter.colorMatrix()
             aero.inputImage = current
@@ -540,25 +602,18 @@ class CinematicPipeline {
             hslMatrix.gVector = CIVector(x: 0.01, y: 0.95 - folDens * 0.55 + gT, z: 0.02 + folDens * 0.20, w: 0)
             hslMatrix.bVector = CIVector(x: -0.02, y: -folDens * 0.35 - folCool * 0.25, z: 0.98 + folCool * 0.25 + bT, w: 0)
             
-            // Toque químico extra solo en las cámaras secundarias para que cada una sea inconfundible
             switch profile {
             case .dispo98:
-                // Neblina verde en sombras de carrete desechable años 90
                 hslMatrix.biasVector = CIVector(x: -0.008, y: 0.022, z: -0.010, w: 0)
             case .polaroid600:
-                // Emulsión instantánea crema/melocotón en sombras y medios
                 hslMatrix.biasVector = CIVector(x: 0.020, y: 0.008, z: -0.024, w: 0)
             case .cinestill800T:
-                // Balance frío de tungsteno
                 hslMatrix.biasVector = CIVector(x: -0.014, y: 0.004, z: 0.024, w: 0)
             case .kodak2383:
-                // Separación Teal en sombras profundas y oro en pieles
                 hslMatrix.biasVector = CIVector(x: 0.006, y: -0.002, z: -0.010, w: 0)
             case .gold200:
-                // Baño ámbar cálido de Kodak Gold
                 hslMatrix.biasVector = CIVector(x: 0.016, y: 0.006, z: -0.020, w: 0)
             case .superia400:
-                // Sutil tinte magenta en sombras y verde esmeralda
                 hslMatrix.biasVector = CIVector(x: 0.008, y: -0.006, z: 0.006, w: 0)
             default:
                 hslMatrix.biasVector = CIVector(x: 0, y: 0, z: 0, w: 0)
@@ -566,7 +621,6 @@ class CinematicPipeline {
             if let out = hslMatrix.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 7. Desaturación / Saturación Orgánica
         if abs(params.vibrance) > 0.01 {
             let vib = CIFilter.vibrance()
             vib.inputImage = current
@@ -592,7 +646,6 @@ class CinematicPipeline {
         }
         if let out = cc.outputImage?.cropped(to: extent) { current = out }
         
-        // 8. Split-Toning Polinómico
         if (params.splitHighWarmth > 0.01 || abs(params.splitShadowTint) > 0.01) && profile != .ilfordHP5 && profile != .triX400 {
             let poly = CIFilter.colorPolynomial()
             poly.inputImage = current
@@ -621,7 +674,6 @@ class CinematicPipeline {
             if let out = poly.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 9. Curva Tonal S-Curve
         let sAmount = Double(params.contrastSCurve)
         let density = Double(params.filmDensity)
         let crush = Double(params.blackCrush)
@@ -646,7 +698,6 @@ class CinematicPipeline {
         curve.point4 = CGPoint(x: 1.00, y: p4)
         if let out = curve.outputImage?.cropped(to: extent) { current = out }
         
-        // 10. Halation / Soft Mist
         let totalGlow = max(params.bloom, params.softMist)
         if totalGlow > 0.04 {
             let bloom = CIFilter.bloom()
@@ -656,7 +707,6 @@ class CinematicPipeline {
             if let out = bloom.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 11. Modo Retrato Óptico
         if portraitDepthBlur > 0.05 {
             let blur = CIFilter.gaussianBlur()
             blur.inputImage = current.clampedToExtent()
@@ -678,7 +728,6 @@ class CinematicPipeline {
             }
         }
         
-        // 12. Viñeteado Óptico
         if params.vignette > 0.02 {
             let vignette = CIFilter.vignette()
             vignette.inputImage = current
@@ -687,18 +736,35 @@ class CinematicPipeline {
             if let out = vignette.outputImage?.cropped(to: extent) { current = out }
         }
         
-        // 13. Light Leak y Anamórfico
-        if lightLeakAmount > 0.04 {
+        // QUEMADURA DE FIN DE ROLLO (Film Burn) + Fuga de Luz Analógica
+        let burnTotal = max(lightLeakAmount, params.filmBurnAmount)
+        if burnTotal > 0.04 {
             let grad = CIFilter.linearGradient()
-            grad.point0 = CGPoint(x: 0, y: extent.height * 0.85)
-            grad.point1 = CGPoint(x: extent.width * 0.45, y: extent.height * 0.32)
-            grad.color0 = CIColor(red: 1.0, green: 0.30, blue: 0.04, alpha: CGFloat(lightLeakAmount * 0.65))
-            grad.color1 = CIColor(red: 1.0, green: 0.65, blue: 0.10, alpha: 0.0)
+            grad.point0 = CGPoint(x: 0, y: extent.height * 0.88)
+            grad.point1 = CGPoint(x: extent.width * 0.48, y: extent.height * 0.28)
+            grad.color0 = CIColor(red: 1.0, green: 0.26, blue: 0.02, alpha: CGFloat(burnTotal * 0.72))
+            grad.color1 = CIColor(red: 1.0, green: 0.68, blue: 0.12, alpha: 0.0)
             if let leakImg = grad.outputImage?.cropped(to: extent) {
                 let screen = CIFilter.screenBlendMode()
                 screen.inputImage = leakImg
                 screen.backgroundImage = current
                 if let out = screen.outputImage?.cropped(to: extent) { current = out }
+            }
+            
+            // Segunda lengüeta de quemadura de celuloide en el borde derecho si Film Burn está alto
+            if params.filmBurnAmount > 0.15 {
+                let burnRight = CIFilter.radialGradient()
+                burnRight.center = CGPoint(x: extent.width * 0.96, y: extent.height * 0.22)
+                burnRight.radius0 = Float(min(extent.width, extent.height) * 0.04)
+                burnRight.radius1 = Float(min(extent.width, extent.height) * 0.42)
+                burnRight.color0 = CIColor(red: 1.0, green: 0.45, blue: 0.08, alpha: CGFloat(params.filmBurnAmount * 0.68))
+                burnRight.color1 = CIColor(red: 1.0, green: 0.15, blue: 0.0, alpha: 0.0)
+                if let bImg = burnRight.outputImage?.cropped(to: extent) {
+                    let screen = CIFilter.screenBlendMode()
+                    screen.inputImage = bImg
+                    screen.backgroundImage = current
+                    if let out = screen.outputImage?.cropped(to: extent) { current = out }
+                }
             }
         }
         
@@ -716,7 +782,6 @@ class CinematicPipeline {
             }
         }
         
-        // 14. Grano 35mm Real Escalado a los Megapíxeles
         if params.grain > 0.02, let rawNoise = CIFilter.randomGenerator().outputImage {
             let grainScale = max(1.8, min(extent.width, extent.height) / 920.0)
             let scaledNoise = rawNoise.transformed(by: CGAffineTransform(scaleX: grainScale, y: grainScale))
@@ -752,11 +817,63 @@ class CinematicPipeline {
         }
     }
     
+    /// Genera una Hoja de Contacto (Contact Sheet) analógica sobre papel de negativo 35mm al revelar un Carrete Real
+    func renderContactSheet(from images: [UIImage], profileName: String) -> UIImage? {
+        guard !images.isEmpty else { return nil }
+        let cols = 3
+        let rows = Int(ceil(Double(images.count) / Double(cols)))
+        let cellW: CGFloat = 540
+        let cellH: CGFloat = 720
+        let pad: CGFloat = 36
+        let headerH: CGFloat = 140
+        let canvasW = CGFloat(cols) * cellW + CGFloat(cols + 1) * pad
+        let canvasH = headerH + CGFloat(rows) * cellH + CGFloat(rows + 1) * pad
+        
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: canvasW, height: canvasH), format: format)
+        
+        return renderer.image { ctx in
+            UIColor(white: 0.05, alpha: 1.0).setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: canvasW, height: canvasH))
+            
+            let titleAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.monospacedSystemFont(ofSize: 34, weight: .bold),
+                .foregroundColor: UIColor(red: 0.96, green: 0.68, blue: 0.24, alpha: 0.92)
+            ]
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            let headerStr = "oCam 35MM CONTACT SHEET // \(profileName.uppercased()) // \(df.string(from: Date()))"
+            (headerStr as NSString).draw(at: CGPoint(x: pad, y: 48), withAttributes: titleAttrs)
+            
+            for (idx, img) in images.enumerated() {
+                let r = idx / cols
+                let c = idx % cols
+                let x = pad + CGFloat(c) * (cellW + pad)
+                let y = headerH + pad + CGFloat(r) * (cellH + pad)
+                let rect = CGRect(x: x, y: y, width: cellW, height: cellH - 36)
+                
+                ctx.cgContext.saveGState()
+                ctx.cgContext.clip(to: rect)
+                img.draw(in: rect)
+                ctx.cgContext.restoreGState()
+                
+                let numAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.monospacedSystemFont(ofSize: 22, weight: .bold),
+                    .foregroundColor: UIColor(red: 0.95, green: 0.58, blue: 0.15, alpha: 0.85)
+                ]
+                let frameCode = "▶ \(idx + 1)A   oCam-400"
+                (frameCode as NSString).draw(at: CGPoint(x: x + 8, y: y + cellH - 30), withAttributes: numAttrs)
+            }
+        }
+    }
+    
     func applyFinalTouches(
         to image: UIImage,
         aspectRatio: AspectRatioOption,
         frameStyle: FrameStyleOption,
-        dateStampEnabled: Bool
+        dateStampEnabled: Bool,
+        dustAndScratches: Float = 0.0
     ) -> UIImage {
         let origW = image.size.width
         let origH = image.size.height
@@ -815,6 +932,37 @@ class CinematicPipeline {
             ctx.cgContext.saveGState()
             ctx.cgContext.clip(to: photoRect)
             image.draw(in: CGRect(x: borderSide - cropX, y: borderSide - cropY, width: origW, height: origH))
+            
+            // POLVO Y RAYONES REALES DE CELULOIDE (Dust & Scratches)
+            if dustAndScratches > 0.03 {
+                var rng = SeededRandomGenerator(seed: UInt64(Int(cropW + cropH)))
+                let dustCount = Int(85 * dustAndScratches)
+                let scratchCount = max(1, Int(6 * dustAndScratches))
+                
+                // Micro-motas de polvo iluminadas
+                for _ in 0..<dustCount {
+                    let dx = borderSide + CGFloat.random(in: 0..<cropW, using: &rng)
+                    let dy = borderSide + CGFloat.random(in: 0..<cropH, using: &rng)
+                    let radius = CGFloat.random(in: 1.2...(max(2.5, min(cropW, cropH) * 0.0025)), using: &rng)
+                    let alpha = CGFloat.random(in: 0.18...0.52, using: &rng) * CGFloat(dustAndScratches)
+                    UIColor(red: 1.0, green: 0.96, blue: 0.88, alpha: alpha).setFill()
+                    ctx.cgContext.fillEllipse(in: CGRect(x: dx, y: dy, width: radius, height: radius * CGFloat.random(in: 0.8...2.2, using: &rng)))
+                }
+                
+                // Rayones verticales sutiles de transporte de carrete 35mm
+                for _ in 0..<scratchCount {
+                    let sx = borderSide + CGFloat.random(in: (cropW * 0.08)..<(cropW * 0.92), using: &rng)
+                    let syStart = borderSide + CGFloat.random(in: 0..<(cropH * 0.35), using: &rng)
+                    let syEnd = syStart + CGFloat.random(in: (cropH * 0.25)..<(cropH * 0.65), using: &rng)
+                    let sAlpha = CGFloat.random(in: 0.12...0.32, using: &rng) * CGFloat(dustAndScratches)
+                    ctx.cgContext.setStrokeColor(UIColor(white: 0.95, alpha: sAlpha).cgColor)
+                    ctx.cgContext.setLineWidth(max(1.0, min(cropW, cropH) * 0.0007))
+                    ctx.cgContext.move(to: CGPoint(x: sx, y: syStart))
+                    ctx.cgContext.addLine(to: CGPoint(x: sx + CGFloat.random(in: -3...3, using: &rng), y: min(borderSide + cropH, syEnd)))
+                    ctx.cgContext.strokePath()
+                }
+            }
+            
             ctx.cgContext.restoreGState()
             
             if dateStampEnabled {
@@ -889,6 +1037,9 @@ class CinematicPipeline {
         profile: FilmProfile,
         params: FilmLookParameters,
         portraitDepthBlur: Float,
+        actionPanEnabled: Bool = false,
+        actionPanIntensity: Float = 0.0,
+        actionPanStyle: ActionPanStyle = .horizontal,
         lightLeakAmount: Float,
         anamorphicMode: Bool
     ) -> UIImage? {
@@ -898,6 +1049,9 @@ class CinematicPipeline {
             params: params,
             filterEnabled: true,
             portraitDepthBlur: portraitDepthBlur,
+            actionPanEnabled: actionPanEnabled,
+            actionPanIntensity: actionPanIntensity,
+            actionPanStyle: actionPanStyle,
             lightLeakAmount: lightLeakAmount,
             anamorphicMode: anamorphicMode,
             isRAW: false,
@@ -918,6 +1072,9 @@ class CinematicPipeline {
         params: FilmLookParameters,
         filterEnabled: Bool = true,
         portraitDepthBlur: Float = 0.0,
+        actionPanEnabled: Bool = false,
+        actionPanIntensity: Float = 0.65,
+        actionPanStyle: ActionPanStyle = .horizontal,
         lightLeakAmount: Float = 0.0,
         anamorphicMode: Bool = false,
         dateStampEnabled: Bool = false,
@@ -943,7 +1100,6 @@ class CinematicPipeline {
         default: targetExifOrientation = .right
         }
         
-        // Decodificación Bayer RAW con isLensCorrectionEnabled = true para activar el mapa DNG que corrige el sombreado verde en los bordes
         if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
             rawFilter.isLensCorrectionEnabled = true
             rawFilter.luminanceNoiseReductionAmount = 0.95
@@ -999,6 +1155,9 @@ class CinematicPipeline {
             params: params,
             filterEnabled: filterEnabled,
             portraitDepthBlur: portraitDepthBlur,
+            actionPanEnabled: actionPanEnabled,
+            actionPanIntensity: actionPanIntensity,
+            actionPanStyle: actionPanStyle,
             lightLeakAmount: lightLeakAmount,
             anamorphicMode: anamorphicMode,
             isRAW: usedCIRAW,
@@ -1011,12 +1170,13 @@ class CinematicPipeline {
         }
         
         var uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
-        if filterEnabled && (aspectRatio != .fourThree || frameStyle != .none || dateStampEnabled) {
+        if filterEnabled && (aspectRatio != .fourThree || frameStyle != .none || dateStampEnabled || params.dustAndScratches > 0.03) {
             uiImage = applyFinalTouches(
                 to: uiImage,
                 aspectRatio: aspectRatio,
                 frameStyle: frameStyle,
-                dateStampEnabled: dateStampEnabled
+                dateStampEnabled: dateStampEnabled,
+                dustAndScratches: params.dustAndScratches
             )
         }
         
@@ -1034,13 +1194,89 @@ class CinematicPipeline {
         let statusText = usedCIRAW ? "RAW \(mp)MP" : "\(mp)MP"
         return DevelopedPhotoResult(jpegData: finalData, previewImage: uiImage, status: statusText, exifSummary: encoded.summary)
     }
+    
+    /// MOTOR DE VIDEO CORTO "SUPER 8 / 16MM" (Procesa video a estética 18 FPS con Jitter de Proyector, Grano y Marco Analógico)
+    func exportSuper8Movie(
+        from inputURL: URL,
+        profile: FilmProfile,
+        params: FilmLookParameters,
+        lightLeakAmount: Float,
+        completion: @escaping (URL?) -> Void
+    ) {
+        let asset = AVAsset(url: inputURL)
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("oCam_Super8_\(Int(Date().timeIntervalSince1970)).mp4")
+        try? FileManager.default.removeItem(at: outputURL)
+        
+        let profileCopy = profile
+        var paramsCopy = params
+        paramsCopy.grain = max(0.38, params.grain)
+        paramsCopy.vignette = max(0.32, params.vignette)
+        let leakCopy = max(lightLeakAmount, params.filmBurnAmount)
+        
+        AVVideoComposition.videoComposition(with: asset, applyingCIFiltersWithHandler: { request in
+            let src = request.sourceImage
+            let ext = src.extent
+            let frameIdx = Int(request.compositionTime.seconds * 18.0)
+            
+            // Efecto de proyector Super 8: Jitter vertical sutil a 18 FPS
+            let jitterY = (frameIdx % 3 == 0) ? 2.5 : ((frameIdx % 5 == 0) ? -2.0 : 0.0)
+            let jittered = src.transformed(by: CGAffineTransform(translationX: 0, y: jitterY)).cropped(to: ext)
+            
+            var filtered = CinematicPipeline.shared.applyCinematicLook(
+                to: jittered,
+                profile: profileCopy,
+                params: paramsCopy,
+                filterEnabled: true,
+                portraitDepthBlur: 0.0,
+                actionPanEnabled: false,
+                actionPanIntensity: 0.0,
+                lightLeakAmount: leakCopy,
+                anamorphicMode: false,
+                isRAW: false,
+                is48MP: false,
+                applyEVInSoftware: true
+            )
+            
+            // Parpadeo cálido de inicio/fin de bobina Super 8
+            if frameIdx < 5 {
+                let flashBurn = CIFilter. radialGradient()
+                flashBurn.center = CGPoint(x: ext.midX, y: ext.midY)
+                flashBurn.radius0 = Float(ext.width * 0.1)
+                flashBurn.radius1 = Float(ext.height * 0.8)
+                flashBurn.color0 = CIColor(red: 1.0, green: 0.45, blue: 0.05, alpha: 0.55)
+                flashBurn.color1 = CIColor(red: 1.0, green: 0.20, blue: 0.0, alpha: 0.0)
+                if let bImg = flashBurn.outputImage?.cropped(to: ext) {
+                    filtered = bImg.composited(over: filtered).cropped(to: ext)
+                }
+            }
+            
+            request.finish(with: filtered, context: CinematicPipeline.shared.ciContext)
+        }, completionHandler: { videoComposition, _ in
+            guard let comp = videoComposition,
+                  let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
+                completion(inputURL)
+                return
+            }
+            exporter.outputURL = outputURL
+            exporter.outputFileType = .mp4
+            exporter.videoComposition = comp
+            exporter.exportAsynchronously {
+                if exporter.status == .completed {
+                    completion(outputURL)
+                } else {
+                    completion(inputURL)
+                }
+            }
+        })
+    }
 }
 
-// MARK: - 4. Controlador de Hardware oCam (Con Custom Cameras Persistentes, Dual Configurable y Ahorro de Batería)
+// MARK: - 4. Controlador de Hardware oCam (Con Carrete Real 12 Exp, Acción/Barrido y Video Super 8)
 @Observable
-class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
+class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
+    private let movieOutput = AVCaptureMovieFileOutput()
     private let sessionQueue = DispatchQueue(label: "com.ocam.sessionQueue")
     private let motionManager = CMMotionManager()
     private let customPresetsKey = "com.ocam.savedCustomPresets.v1"
@@ -1049,6 +1285,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     private var lastExposureUpdate: Date = .distantPast
     private var max12MPDimension = CMVideoDimensions(width: 4032, height: 3024)
     private var max48MPDimension: CMVideoDimensions?
+    private var super8Timer: Timer?
     
     var capturedImage: UIImage?
     var doubleExposureFirstShot: UIImage?
@@ -1060,13 +1297,31 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     var isAppInForeground = true
     var isAEAFLocked = false
     
+    // 1. Modo Dual Configurable
     var filtersEnabled = true
     var dualCaptureEnabled = false
-    var dualSecondaryProfile: FilmProfile = .normalClean // Por defecto Normal, pero elegible entre todas las cámaras
+    var dualSecondaryProfile: FilmProfile = .normalClean
     
-    // Apartado de Custom Cameras guardadas entre sesiones
+    // 2. Custom Cameras Persistentes (Al final del carrusel único)
     var customPresets: [CustomCameraPreset] = []
     var activeCustomPresetID: UUID? = nil
+    
+    // 3. NUEVO: Cámara de Acción / Barrido (Panning & Long Exposure)
+    var actionPanEnabled = false
+    var actionPanIntensity: Float = 0.65
+    var actionPanStyle: ActionPanStyle = .horizontal
+    
+    // 4. NUEVO: Modo "Carrete Real" (Film Roll Mode - 12 Exposiciones ocultas hasta revelar)
+    var filmRollModeEnabled = false
+    let filmRollCapacity: Int = 12
+    var filmRollShotsData: [Data] = []
+    var filmRollPreviews: [UIImage] = []
+    var isDevelopingRoll = false
+    
+    // 5. NUEVO: Motor de Video Corto "Super 8 / 16mm"
+    var super8ModeEnabled = false
+    var isRecordingSuper8 = false
+    var super8RecordingSeconds: Int = 0
     
     var doubleExposureEnabled = false
     var doubleExposureOpacity: Float = 0.65
@@ -1115,7 +1370,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         }
     }
     
-    // MARK: - Persistencia de Custom Cameras en UserDefaults
     func loadCustomPresetsFromDisk() {
         guard let data = UserDefaults.standard.data(forKey: customPresetsKey),
               let decoded = try? JSONDecoder().decode([CustomCameraPreset].self, from: data) else { return }
@@ -1162,7 +1416,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         }
     }
     
-    // MARK: - Optimización de Batería en Segundo Plano (0% Consumo cuando minimizas la app)
     func setAppForegroundState(_ active: Bool) {
         guard isAppInForeground != active else { return }
         isAppInForeground = active
@@ -1213,6 +1466,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         params = FilmProfile.normalClean.recommended
         simpleMacroIntensity = 0.0
         portraitDepthBlur = 0.0
+        actionPanEnabled = false
         lightLeakEnabled = false
         setCameraExposureBias(0.0)
         updateNightModeHardware()
@@ -1220,7 +1474,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     
     private func startMotionTracking() {
         guard motionManager.isAccelerometerAvailable else { return }
-        motionManager.accelerometerUpdateInterval = 0.20 // Optimizado para ahorrar batería manteniendo fluidez
+        motionManager.accelerometerUpdateInterval = 0.20
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self = self, let acc = data?.acceleration else { return }
             let angle = atan2(acc.x, -acc.y) * 180.0 / .pi
@@ -1256,7 +1510,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         self.max48MPDimension = found48MPDim
         let supports48 = (found48MPDim != nil)
         
-        if prefer48MP, let format48 = bestFormat48MP, let d48 = found48MPDim {
+        if prefer48MP && !super8ModeEnabled, let format48 = bestFormat48MP, let d48 = found48MPDim {
             do {
                 if self.session.canSetSessionPreset(.inputPriority) {
                     self.session.sessionPreset = .inputPriority
@@ -1314,6 +1568,10 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
             }
         }
         
+        if session.canAddOutput(movieOutput) {
+            session.addOutput(movieOutput)
+        }
+        
         configureSensorFormat(for: device, prefer48MP: use48MPMode)
         
         session.commitConfiguration()
@@ -1324,8 +1582,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     }
     
     func updateNightModeHardware() {
-        let isNight = params.nightMode
-        let nightSec = nightExposureSeconds
+        let isNight = params.nightMode || actionPanEnabled
+        let nightSec = actionPanEnabled ? 0.14 : nightExposureSeconds
         sessionQueue.async {
             guard let device = self.currentDevice else { return }
             do {
@@ -1336,7 +1594,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 if isNight {
                     let timescale = Int32(max(4, min(30, round(1.0 / Double(max(0.04, nightSec))))))
                     let duration = CMTimeMake(value: 1, timescale: timescale)
-                    let targetISO = min(device.activeFormat.maxISO, max(400, device.iso))
+                    let targetISO = min(device.activeFormat.maxISO, max(50, device.iso))
                     device.setExposureModeCustom(duration: duration, iso: targetISO, completionHandler: nil)
                 } else if self.shutterSpeed == .auto {
                     device.exposureMode = .continuousAutoExposure
@@ -1409,8 +1667,14 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let hasRAW = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
         DispatchQueue.main.async {
             self.isRAWActive = hasRAW
-            if self.dualCaptureEnabled {
-                self.statusMessage = "DUAL (+ \(self.dualSecondaryProfile.rawValue.uppercased()))"
+            if self.isRecordingSuper8 {
+                self.statusMessage = "REC SUPER 8 • \(self.super8RecordingSeconds)s"
+            } else if self.filmRollModeEnabled {
+                self.statusMessage = "CARRETE \(self.filmRollShotsData.count)/\(self.filmRollCapacity)"
+            } else if self.actionPanEnabled {
+                self.statusMessage = "ACTION PAN (\(self.actionPanStyle.rawValue.uppercased()))"
+            } else if self.dualCaptureEnabled {
+                self.statusMessage = "DUAL (+\(self.dualSecondaryProfile.rawValue.uppercased()))"
             } else if !self.filtersEnabled || self.selectedProfile == .normalClean {
                 self.statusMessage = "NORMAL SIN FILTRO"
             } else if self.doubleExposureEnabled {
@@ -1496,7 +1760,154 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         }
     }
     
+    // MARK: - Grabación de Video Corto "Super 8 / 16mm" (18 FPS + Jitter + Grano)
+    func toggleSuper8Recording() {
+        if isRecordingSuper8 {
+            stopSuper8Recording()
+        } else {
+            startSuper8Recording()
+        }
+    }
+    
+    func startSuper8Recording() {
+        guard !isRecordingSuper8 && !isProcessing else { return }
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        isRecordingSuper8 = true
+        super8RecordingSeconds = 0
+        updateStatusBadge()
+        
+        super8Timer?.invalidate()
+        super8Timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] t in
+            guard let self = self else { return }
+            self.super8RecordingSeconds += 1
+            self.updateStatusBadge()
+            if self.super8RecordingSeconds >= 12 {
+                t.invalidate()
+                self.stopSuper8Recording()
+            }
+        }
+        
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("raw_super8_\(UUID().uuidString).mov")
+        sessionQueue.async {
+            if let dev = self.currentDevice {
+                self.session.beginConfiguration()
+                if self.session.canSetSessionPreset(.high) {
+                    self.session.sessionPreset = .high
+                }
+                self.session.commitConfiguration()
+                let _ = dev
+            }
+            if let conn = self.movieOutput.connection(with: .video), conn.isActive {
+                self.movieOutput.startRecording(to: tempURL, recordingDelegate: self)
+            } else {
+                DispatchQueue.main.async {
+                    self.isRecordingSuper8 = false
+                    self.super8Timer?.invalidate()
+                    self.statusMessage = "VIDEO NO DISPONIBLE"
+                }
+            }
+        }
+    }
+    
+    func stopSuper8Recording() {
+        guard isRecordingSuper8 else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        super8Timer?.invalidate()
+        super8Timer = nil
+        isRecordingSuper8 = false
+        statusMessage = "REVELANDO SUPER 8..."
+        sessionQueue.async {
+            if self.movieOutput.isRecording {
+                self.movieOutput.stopRecording()
+            }
+        }
+    }
+    
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+        let want48 = use48MPMode && is48MPSupported && (currentZoom == 1.0)
+        sessionQueue.async {
+            if let dev = self.currentDevice {
+                self.session.beginConfiguration()
+                self.configureSensorFormat(for: dev, prefer48MP: want48)
+                self.session.commitConfiguration()
+            }
+        }
+        
+        guard error == nil else {
+            DispatchQueue.main.async {
+                self.statusMessage = "CLIP GUARDADO"
+                self.updateStatusBadge()
+            }
+            return
+        }
+        
+        let prof = selectedProfile
+        let prms = params
+        let leak = lightLeakEnabled ? lightLeakIntensity : 0.0
+        
+        CinematicPipeline.shared.exportSuper8Movie(
+            from: outputFileURL,
+            profile: prof,
+            params: prms,
+            lightLeakAmount: leak
+        ) { finalURL in
+            guard let urlToSave = finalURL else { return }
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: urlToSave, options: nil)
+            }, completionHandler: { success, _ in
+                DispatchQueue.main.async {
+                    if success {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        self.statusMessage = "SUPER 8 GUARDADO"
+                    } else {
+                        self.statusMessage = "ERROR AL GUARDAR S8"
+                    }
+                }
+            })
+        }
+    }
+    
+    // MARK: - Revelado Químico del Modo "Carrete Real" (Film Roll Mode)
+    func developCurrentFilmRollNow() {
+        guard !filmRollShotsData.isEmpty && !isDevelopingRoll else { return }
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        isDevelopingRoll = true
+        let shotsToDevelop = filmRollShotsData
+        let previewsToSheet = filmRollPreviews
+        let profName = selectedProfile.rawValue
+        statusMessage = "REVELANDO ROLLO (\(shotsToDevelop.count))..."
+        
+        Task.detached(priority: .userInitiated) {
+            let contactSheet = CinematicPipeline.shared.renderContactSheet(from: previewsToSheet, profileName: profName)
+            let sheetData = contactSheet?.jpegData(compressionQuality: 0.95)
+            
+            PHPhotoLibrary.shared().performChanges({
+                for jpeg in shotsToDevelop {
+                    let req = PHAssetCreationRequest.forAsset()
+                    req.addResource(with: .photo, data: jpeg, options: nil)
+                }
+                if let sData = sheetData {
+                    let sheetReq = PHAssetCreationRequest.forAsset()
+                    sheetReq.addResource(with: .photo, data: sData, options: nil)
+                }
+            }, completionHandler: { _, _ in
+                DispatchQueue.main.async {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    self.capturedImage = contactSheet ?? previewsToSheet.last
+                    self.filmRollShotsData.removeAll()
+                    self.filmRollPreviews.removeAll()
+                    self.isDevelopingRoll = false
+                    self.statusMessage = "CARRETE + CONTACT SHEET OK"
+                }
+            })
+        }
+    }
+    
     func triggerShutter() {
+        if super8ModeEnabled {
+            toggleSuper8Recording()
+            return
+        }
         guard !isProcessing && countdownRemaining == 0 else { return }
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         
@@ -1524,8 +1935,8 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let want48MP = self.use48MPMode && self.is48MPSupported && (self.currentZoom == 1.0)
         let wantRAW = self.useRAWCapture && !want48MP && (self.currentZoom == 1.0)
         let useFlash = self.flashEnabled
-        let isNight = self.params.nightMode
-        statusMessage = dualCaptureEnabled ? "GUARDANDO DUAL..." : (want48MP ? "48MP..." : (wantRAW ? "RAW..." : "REVELANDO..."))
+        let isNight = self.params.nightMode || self.actionPanEnabled
+        statusMessage = actionPanEnabled ? "BARRIDO ACCIÓN..." : (dualCaptureEnabled ? "GUARDANDO DUAL..." : (want48MP ? "48MP..." : (wantRAW ? "RAW..." : "REVELANDO...")))
         
         sessionQueue.async {
             guard let connection = self.photoOutput.connection(with: .video), connection.isEnabled, connection.isActive else {
@@ -1615,6 +2026,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let saveDual = self.dualCaptureEnabled
         let secondaryProfile = self.dualSecondaryProfile
         let portrait = self.portraitDepthBlur
+        let panOn = self.actionPanEnabled
+        let panInt = self.actionPanIntensity
+        let panStyle = self.actionPanStyle
         let leakAmt = self.lightLeakEnabled ? self.lightLeakIntensity : 0.0
         let anamorphic = self.anamorphicMode
         let stamp = self.dateStampEnabled
@@ -1624,9 +2038,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
         let isDoubleExp = self.doubleExposureEnabled
         let doubleExpAlpha = self.doubleExposureOpacity
         let firstShot = self.doubleExposureFirstShot
+        let isFilmRoll = self.filmRollModeEnabled
         
         Task.detached(priority: .userInitiated) {
-            // 1. Si está activo DUAL SHOT: una foto es SIEMPRE la cámara actualmente en uso (primaryProfile) y la otra es la 2da cámara elegida (por defecto Normal)
             var secondaryJPEGData: Data? = nil
             if saveDual {
                 let secResult = CinematicPipeline.shared.developFinalPhoto(
@@ -1639,6 +2053,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                     params: secondaryProfile.recommended,
                     filterEnabled: secondaryProfile != .normalClean,
                     portraitDepthBlur: portrait,
+                    actionPanEnabled: panOn,
+                    actionPanIntensity: panInt,
+                    actionPanStyle: panStyle,
                     lightLeakAmount: leakAmt,
                     anamorphicMode: anamorphic,
                     dateStampEnabled: stamp,
@@ -1649,7 +2066,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 secondaryJPEGData = secResult.jpegData
             }
             
-            // 2. Revelar la foto principal con la cámara actualmente en uso
             let result = CinematicPipeline.shared.developFinalPhoto(
                 data: data,
                 rawMetadata: photoMeta,
@@ -1660,6 +2076,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 params: primaryParams,
                 filterEnabled: filterOn,
                 portraitDepthBlur: portrait,
+                actionPanEnabled: panOn,
+                actionPanIntensity: panInt,
+                actionPanStyle: panStyle,
                 lightLeakAmount: leakAmt,
                 anamorphicMode: anamorphic,
                 dateStampEnabled: stamp,
@@ -1693,6 +2112,24 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                 finalDataToSave = result.jpegData
             }
             
+            // Si está activo el Modo "Carrete Real", acumular el disparo en secreto hasta llegar a 12 (o hasta que el usuario toque Revelar)
+            if isFilmRoll, let jpegData = finalDataToSave {
+                await MainActor.run {
+                    self.filmRollShotsData.append(jpegData)
+                    self.filmRollPreviews.append(outputImage)
+                    self.doubleExposureFirstShot = nil
+                    self.isProcessing = false
+                    let count = self.filmRollShotsData.count
+                    if count >= self.filmRollCapacity {
+                        self.developCurrentFilmRollNow()
+                    } else {
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                        self.statusMessage = "CARRETE OCULTO \(count)/\(self.filmRollCapacity)"
+                    }
+                }
+                return
+            }
+            
             if let jpegData = finalDataToSave {
                 PHPhotoLibrary.shared().performChanges({
                     if let secData = secondaryJPEGData {
@@ -1708,7 +2145,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
                             if saveDual && secondaryJPEGData != nil {
                                 self.statusMessage = "DUAL (\(primaryProfile.rawValue)+\(secondaryProfile.rawValue))"
                             } else {
-                                self.statusMessage = isDoubleExp ? "2X EXP OK" : result.status
+                                self.statusMessage = panOn ? "ACTION PAN OK" : (isDoubleExp ? "2X EXP OK" : result.status)
                             }
                             self.lastExifSummary = result.exifSummary
                         } else {
@@ -1728,7 +2165,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
     }
 }
 
-// MARK: - 5. Visor Óptico con Toque Simple (Enfoque) y Pulsación Larga (Bloqueo AE/AF)
+// MARK: - 5. Visor Óptico
 struct NativeCameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     var onTapFocus: (CGPoint, CGPoint, Bool) -> Void
@@ -1775,13 +2212,16 @@ struct NativeCameraPreview: UIViewRepresentable {
     }
 }
 
-// MARK: - 6. Capa de Previsualización Fiel en Vivo (Pausa el grano cuando la app pasa a 2do plano)
+// MARK: - 6. Capa de Previsualización Fiel en Vivo (Con Polvo/Rayones, Film Burn, Barrido y Super 8)
 struct LiveOpticalEffectsView: View {
     let profile: FilmProfile
     let params: FilmLookParameters
     let filterEnabled: Bool
     let isAppActive: Bool
     let portraitDepthBlur: Float
+    let actionPanEnabled: Bool
+    let actionPanIntensity: Float
+    let isSuper8Recording: Bool
     let lightLeakEnabled: Bool
     let lightLeakIntensity: Float
     let anamorphicMode: Bool
@@ -1798,7 +2238,6 @@ struct LiveOpticalEffectsView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Soporte en vivo para el ajuste R-G-B incluso cuando estás en la cámara Normal
                 if abs(params.redTrim) > 0.01 || abs(params.greenTrim) > 0.01 || abs(params.blueTrim) > 0.01 {
                     Color(
                         red: min(1.0, max(0.0, 0.5 + Double(params.redTrim) * 0.45)),
@@ -1807,6 +2246,21 @@ struct LiveOpticalEffectsView: View {
                     )
                     .opacity(0.20)
                     .blendMode(.softLight)
+                }
+                
+                // Guías ópticas de Barrido de Acción en vivo
+                if actionPanEnabled {
+                    RadialGradient(
+                        colors: [
+                            .clear,
+                            Color.black.opacity(Double(actionPanIntensity) * 0.25),
+                            Color(red: 1.0, green: 0.65, blue: 0.20).opacity(Double(actionPanIntensity) * 0.16)
+                        ],
+                        center: .center,
+                        startRadius: min(geo.size.width, geo.size.height) * 0.22,
+                        endRadius: max(geo.size.width, geo.size.height) * 0.65
+                    )
+                    .blendMode(.screen)
                 }
                 
                 if filterEnabled && profile != .normalClean {
@@ -1881,11 +2335,12 @@ struct LiveOpticalEffectsView: View {
                         .blendMode(.screen)
                     }
                     
-                    if lightLeakEnabled && lightLeakIntensity > 0.04 {
+                    let totalBurn = max(lightLeakEnabled ? lightLeakIntensity : 0.0, params.filmBurnAmount)
+                    if totalBurn > 0.04 {
                         LinearGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.28, blue: 0.02).opacity(Double(lightLeakIntensity) * 0.65),
-                                Color(red: 1.0, green: 0.65, blue: 0.10).opacity(Double(lightLeakIntensity) * 0.25),
+                                Color(red: 1.0, green: 0.28, blue: 0.02).opacity(Double(totalBurn) * 0.68),
+                                Color(red: 1.0, green: 0.65, blue: 0.10).opacity(Double(totalBurn) * 0.28),
                                 .clear
                             ],
                             startPoint: .topLeading,
@@ -1921,13 +2376,13 @@ struct LiveOpticalEffectsView: View {
                         )
                     }
                     
-                    // El generador de grano se congela automáticamente cuando la app está en 2do plano (paused: !isAppActive)
-                    if params.grain > 0.02 {
+                    // Grano 35mm + Polvo y Rayones de Celuloide en Vivo
+                    if params.grain > 0.02 || params.dustAndScratches > 0.02 || isSuper8Recording {
                         TimelineView(.periodic(from: .now, by: 0.11)) { timeline in
                             Canvas { context, size in
                                 guard isAppActive else { return }
                                 let seed = Int(timeline.date.timeIntervalSinceReferenceDate * 12)
-                                let count = Int(380 * params.grain)
+                                let count = Int(360 * max(params.grain, isSuper8Recording ? 0.35 : 0.0))
                                 var rng = SeededRandomGenerator(seed: UInt64(abs(seed) + 1))
                                 for _ in 0..<count {
                                     let x = CGFloat.random(in: 0..<size.width, using: &rng)
@@ -1936,8 +2391,29 @@ struct LiveOpticalEffectsView: View {
                                     let rect = CGRect(x: x, y: y, width: 1.8, height: 1.8)
                                     context.fill(
                                         Path(ellipseIn: rect),
-                                        with: .color((isBright ? Color.white : Color.black).opacity(Double(params.grain) * 0.28))
+                                        with: .color((isBright ? Color.white : Color.black).opacity(Double(max(params.grain, 0.25)) * 0.28))
                                     )
+                                }
+                                
+                                let dustLevel = max(params.dustAndScratches, isSuper8Recording ? 0.35 : 0.0)
+                                if dustLevel > 0.02 {
+                                    let dustCount = Int(22 * dustLevel)
+                                    for _ in 0..<dustCount {
+                                        let dx = CGFloat.random(in: 0..<size.width, using: &rng)
+                                        let dy = CGFloat.random(in: 0..<size.height, using: &rng)
+                                        let r = CGFloat.random(in: 1.5...3.2, using: &rng)
+                                        context.fill(
+                                            Path(ellipseIn: CGRect(x: dx, y: dy, width: r, height: r)),
+                                            with: .color(Color.white.opacity(Double(dustLevel) * 0.45))
+                                        )
+                                    }
+                                    if seed % 2 == 0 {
+                                        let sx = CGFloat.random(in: (size.width * 0.15)..<(size.width * 0.85), using: &rng)
+                                        var scratch = Path()
+                                        scratch.move(to: CGPoint(x: sx, y: 0))
+                                        scratch.addLine(to: CGPoint(x: sx, y: size.height))
+                                        context.stroke(scratch, with: .color(Color.white.opacity(Double(dustLevel) * 0.28)), lineWidth: 0.8)
+                                    }
                                 }
                             }
                         }
@@ -2021,7 +2497,7 @@ struct SeededRandomGenerator: RandomNumberGenerator {
     }
 }
 
-// MARK: - 7. Laboratorio oCam Studio
+// MARK: - 7. Laboratorio oCam Studio (Con Revelado en Lote BATCH + Polvo/Rayones + Film Burn)
 struct GalleryDarkroomView: View {
     let originalData: Data
     var onSaveSuccess: (UIImage, String) -> Void
@@ -2032,6 +2508,9 @@ struct GalleryDarkroomView: View {
     @State private var isProMode = false
     @State private var activeTab: Int = 0
     @State private var portraitDepthBlur: Float = 0.0
+    @State private var actionPanEnabled = false
+    @State private var actionPanIntensity: Float = 0.65
+    @State private var actionPanStyle: ActionPanStyle = .horizontal
     @State private var lightLeakEnabled = false
     @State private var lightLeakIntensity: Float = 0.65
     @State private var dateStampEnabled = false
@@ -2043,26 +2522,50 @@ struct GalleryDarkroomView: View {
     @State private var scaledCIImage: CIImage?
     @State private var isSaving = false
     
+    // Revelado en Lote (Batch Processing)
+    @State private var batchSelectedItems: [PhotosPickerItem] = []
+    @State private var isBatchProcessing = false
+    @State private var batchStatusText = ""
+    
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 10) {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         dismiss()
                     } label: {
                         Text("Done")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(.black)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(selectedProfile.badgeColor)
                             .clipShape(Capsule())
                     }
+                    
+                    // Botón de Revelado en Lote (Batch Processing de hasta 20 fotos)
+                    PhotosPicker(selection: $batchSelectedItems, maxSelectionCount: 20, matching: .images) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.stack.3d.up.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text(isBatchProcessing ? batchStatusText : "Lote (Batch)")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 8)
+                        .background(Color.yellow.opacity(0.14))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.yellow.opacity(0.4), lineWidth: 0.6))
+                    }
+                    .disabled(isBatchProcessing)
                     
                     Spacer()
                     
@@ -2070,12 +2573,12 @@ struct GalleryDarkroomView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         isShowingOriginal.toggle()
                     } label: {
-                        Text(isShowingOriginal ? "ORIGINAL" : "COMPARAR")
+                        Text(isShowingOriginal ? "ORIG" : "COMP")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(isShowingOriginal ? .black : .white)
-                            .padding(.horizontal, 11)
+                            .padding(.horizontal, 10)
                             .padding(.vertical, 8)
                             .background(isShowingOriginal ? Color.white : Color.white.opacity(0.14))
                             .clipShape(Capsule())
@@ -2084,18 +2587,20 @@ struct GalleryDarkroomView: View {
                     Menu {
                         Button("Recomendado (\(selectedProfile.rawValue))", systemImage: "sparkles") {
                             params = selectedProfile.recommended
+                            actionPanEnabled = false
                             updatePreview()
                         }
                         Button("Sin Filtro (Cámara Normal)", systemImage: "camera") {
                             selectedProfile = .normalClean
                             params = FilmProfile.normalClean.recommended
+                            actionPanEnabled = false
                             updatePreview()
                         }
                     } label: {
                         Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 34, height: 34)
                             .background(.ultraThinMaterial)
                             .clipShape(Circle())
                     }
@@ -2104,16 +2609,16 @@ struct GalleryDarkroomView: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         saveDevelopedGalleryPhoto()
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.down")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                             Text(isSaving ? "..." : "Guardar")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
@@ -2121,7 +2626,7 @@ struct GalleryDarkroomView: View {
                     }
                     .disabled(isSaving)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.top, 14)
                 
                 ZStack(alignment: .topTrailing) {
@@ -2181,7 +2686,7 @@ struct GalleryDarkroomView: View {
                 
                 VStack(spacing: 8) {
                     HStack {
-                        Text(isProMode ? "MODO PRO (25 CONTROLES)" : "MODO SENCILLO")
+                        Text(isProMode ? "MODO PRO (CELULOIDE + RGB)" : "MODO SENCILLO")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.7))
                         
@@ -2282,10 +2787,17 @@ struct GalleryDarkroomView: View {
                             darkroomSlider(title: "Tint (Green/Magenta)", value: $params.tint, range: -1.0...1.0, format: "%+.2f")
                         } else if activeTab == 3 {
                             darkroomSlider(title: "Halation Glow", value: $params.bloom, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                            darkroomSlider(title: "Soft Mist Filter", value: $params.softMist, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                             darkroomSlider(title: "35mm Film Grain", value: $params.grain, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                            darkroomSlider(title: "Optical Vignette", value: $params.vignette, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
-                            darkroomSlider(title: "Matte Fade Lift", value: $params.fadeMatte, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Polvo y Rayones", value: $params.dustAndScratches, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Quemadura (Film Burn)", value: $params.filmBurnAmount, range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
+                            darkroomSlider(title: "Barrido (Action Pan)", value: Binding(
+                                get: { actionPanEnabled ? actionPanIntensity : 0.0 },
+                                set: { val in
+                                    actionPanIntensity = val
+                                    actionPanEnabled = val > 0.05
+                                    updatePreview()
+                                }
+                            ), range: 0.0...1.0, format: "%.0f%%", multiplier: 100)
                         } else {
                             HStack(spacing: 8) {
                                 ForEach(AspectRatioOption.allCases, id: \.self) { ratio in
@@ -2317,15 +2829,19 @@ struct GalleryDarkroomView: View {
                                         .clipShape(Capsule())
                                 }
                                 Button {
-                                    lightLeakEnabled.toggle()
-                                    updatePreview()
+                                    let all = ActionPanStyle.allCases
+                                    if let idx = all.firstIndex(of: actionPanStyle) {
+                                        actionPanStyle = all[(idx + 1) % all.count]
+                                        actionPanEnabled = true
+                                        updatePreview()
+                                    }
                                 } label: {
-                                    Label("Light Leak", systemImage: "sun.max.fill")
+                                    Label(actionPanStyle.rawValue, systemImage: "wind")
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(lightLeakEnabled ? .black : .white)
+                                        .foregroundStyle(actionPanEnabled ? .black : .white)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 7)
-                                        .background(lightLeakEnabled ? selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                        .background(actionPanEnabled ? selectedProfile.badgeColor : Color.white.opacity(0.12))
                                         .clipShape(Capsule())
                                 }
                                 Button {
@@ -2359,7 +2875,7 @@ struct GalleryDarkroomView: View {
                         studioTabButton(index: 0, icon: "chart.xyaxis.line", title: "Tone")
                         studioTabButton(index: 1, icon: "slider.horizontal.below.square.and.square.filled", title: "RGB")
                         studioTabButton(index: 2, icon: "leaf", title: "HSL")
-                        studioTabButton(index: 3, icon: "sparkles", title: "Optics")
+                        studioTabButton(index: 3, icon: "sparkles", title: "Celuloide")
                         studioTabButton(index: 4, icon: "crop", title: "Crop")
                     }
                     .padding(.horizontal, 16)
@@ -2367,8 +2883,75 @@ struct GalleryDarkroomView: View {
                 }
             }
         }
+        .onChange(of: batchSelectedItems) { _, items in
+            guard !items.isEmpty else { return }
+            runBatchProcessing(items: items)
+        }
         .onAppear {
             prepareScaledPreviewInput()
+        }
+    }
+    
+    // MARK: - Procesamiento en Lote (Batch Processing)
+    private func runBatchProcessing(items: [PhotosPickerItem]) {
+        isBatchProcessing = true
+        let total = items.count
+        let prof = selectedProfile
+        let currentParams = params
+        let port = portraitDepthBlur
+        let panOn = actionPanEnabled
+        let panInt = actionPanIntensity
+        let panSt = actionPanStyle
+        let leakAmt = lightLeakEnabled ? lightLeakIntensity : 0.0
+        let stamp = dateStampEnabled
+        let ratio = aspectRatio
+        let frame = frameStyle
+        
+        Task.detached(priority: .userInitiated) {
+            var lastImg: UIImage? = nil
+            for (index, item) in items.enumerated() {
+                await MainActor.run {
+                    self.batchStatusText = "Lote \(index + 1)/\(total)"
+                }
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    let res = CinematicPipeline.shared.developFinalPhoto(
+                        data: data,
+                        rawMetadata: nil,
+                        wasCapturedAsRAW: false,
+                        profile: prof,
+                        params: currentParams,
+                        filterEnabled: true,
+                        portraitDepthBlur: port,
+                        actionPanEnabled: panOn,
+                        actionPanIntensity: panInt,
+                        actionPanStyle: panSt,
+                        lightLeakAmount: leakAmt,
+                        anamorphicMode: false,
+                        dateStampEnabled: stamp,
+                        aspectRatio: ratio,
+                        frameStyle: frame,
+                        deviceOrientation: .portrait,
+                        isFromGallery: true
+                    )
+                    if let jData = res.jpegData {
+                        lastImg = res.previewImage
+                        PHPhotoLibrary.shared().performChanges({
+                            let req = PHAssetCreationRequest.forAsset()
+                            req.addResource(with: .photo, data: jData, options: nil)
+                        }, completionHandler: nil)
+                    }
+                }
+            }
+            let finalSample = lastImg
+            await MainActor.run {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                self.isBatchProcessing = false
+                self.batchSelectedItems = []
+                if let sImg = finalSample {
+                    onSaveSuccess(sImg, "LOTE (\(total) FOTOS) OK")
+                }
+                dismiss()
+            }
         }
     }
     
@@ -2451,6 +3034,9 @@ struct GalleryDarkroomView: View {
         let prof = selectedProfile
         let currentParams = params
         let port = portraitDepthBlur
+        let panOn = actionPanEnabled
+        let panInt = actionPanIntensity
+        let panSt = actionPanStyle
         let leakAmt = lightLeakEnabled ? lightLeakIntensity : 0.0
         let stamp = dateStampEnabled
         let ratio = aspectRatio
@@ -2462,16 +3048,20 @@ struct GalleryDarkroomView: View {
                 profile: prof,
                 params: currentParams,
                 portraitDepthBlur: port,
+                actionPanEnabled: panOn,
+                actionPanIntensity: panInt,
+                actionPanStyle: panSt,
                 lightLeakAmount: leakAmt,
                 anamorphicMode: false
             ) else { return }
             
-            if ratio != .fourThree || stamp || frame != .none {
+            if ratio != .fourThree || stamp || frame != .none || currentParams.dustAndScratches > 0.03 {
                 img = CinematicPipeline.shared.applyFinalTouches(
                     to: img,
                     aspectRatio: ratio,
                     frameStyle: frame,
-                    dateStampEnabled: stamp
+                    dateStampEnabled: stamp,
+                    dustAndScratches: currentParams.dustAndScratches
                 )
             }
             let finalPreview = img
@@ -2486,6 +3076,9 @@ struct GalleryDarkroomView: View {
         let prof = selectedProfile
         let currentParams = params
         let port = portraitDepthBlur
+        let panOn = actionPanEnabled
+        let panInt = actionPanIntensity
+        let panSt = actionPanStyle
         let leakAmt = lightLeakEnabled ? lightLeakIntensity : 0.0
         let stamp = dateStampEnabled
         let ratio = aspectRatio
@@ -2501,6 +3094,9 @@ struct GalleryDarkroomView: View {
                 params: currentParams,
                 filterEnabled: true,
                 portraitDepthBlur: port,
+                actionPanEnabled: panOn,
+                actionPanIntensity: panInt,
+                actionPanStyle: panSt,
                 lightLeakAmount: leakAmt,
                 anamorphicMode: false,
                 dateStampEnabled: stamp,
@@ -2529,14 +3125,17 @@ struct GalleryDarkroomView: View {
     }
 }
 
-// MARK: - 8. Interfaz Principal oCam (Con Dual Configurable, Custom Cameras y RGB en Cámara Normal)
+// MARK: - 8. Interfaz Principal oCam (Con Custom Cameras al Final del Carrusel Único + Action Pan + Carrete Real + Super 8)
 enum QuickToolItem: String, CaseIterable, Identifiable {
+    case actionPan = "Acción Pan"
+    case filmRoll = "Carrete 12"
+    case super8 = "Super 8"
     case dualCam = "Dual Cam"
+    case dustBurn = "Celuloide"
     case timer = "Timer"
     case night = "Noche"
     case portrait = "Retrato"
     case doubleExp = "2X Exp"
-    case lightLeak = "Leak"
     case dateStamp = "Fecha '98"
     case anamorphic = "2.39:1"
     case horizon = "Nivel"
@@ -2545,12 +3144,15 @@ enum QuickToolItem: String, CaseIterable, Identifiable {
     
     var iconName: String {
         switch self {
+        case .actionPan: return "wind"
+        case .filmRoll: return "film.stack"
+        case .super8: return "video.fill"
         case .dualCam: return "camera.on.rectangle.fill"
+        case .dustBurn: return "flame.fill"
         case .timer: return "timer"
         case .night: return "moon.stars.fill"
         case .portrait: return "camera.aperture"
         case .doubleExp: return "square.on.square.dashed"
-        case .lightLeak: return "sun.max.trianglebadge.exclamationmark"
         case .dateStamp: return "calendar"
         case .anamorphic: return "sparkles.tv"
         case .horizon: return "level"
@@ -2604,7 +3206,7 @@ struct ContentView: View {
     @State private var camera = CameraManager()
     @State private var showTray = false
     @State private var showToolsSheet = false
-    @State private var selectedTool: QuickToolItem = .dualCam
+    @State private var selectedTool: QuickToolItem = .actionPan
     @State private var isProDrawerMode = false
     @State private var showExposureBar = false
     @State private var activeDrawerTab: Int = 0
@@ -2618,6 +3220,7 @@ struct ContentView: View {
     private let zoomLevels: [CGFloat] = [0.5, 1.0, 2.0, 3.0]
     
     private var modeButtonTitle: String {
+        if camera.super8ModeEnabled { return "S8 18FPS" }
         if camera.currentZoom != 1.0 { return "12MP" }
         if camera.use48MPMode && camera.is48MPSupported { return "48MP" }
         if camera.useRAWCapture { return "RAW" }
@@ -2625,7 +3228,7 @@ struct ContentView: View {
     }
     
     private var hasExtraFeaturesActive: Bool {
-        camera.dualCaptureEnabled || camera.timerSeconds > 0 || camera.params.nightMode || camera.portraitDepthBlur > 0.05 || camera.doubleExposureEnabled || camera.dateStampEnabled || camera.lightLeakEnabled || camera.anamorphicMode
+        camera.actionPanEnabled || camera.filmRollModeEnabled || camera.super8ModeEnabled || camera.dualCaptureEnabled || camera.timerSeconds > 0 || camera.params.nightMode || camera.portraitDepthBlur > 0.05 || camera.doubleExposureEnabled || camera.dateStampEnabled || camera.lightLeakEnabled || camera.params.dustAndScratches > 0.03 || camera.params.filmBurnAmount > 0.03
     }
     
     var body: some View {
@@ -2635,13 +3238,12 @@ struct ContentView: View {
             VStack(spacing: 10) {
                 topBarView
                 viewfinderSection
-                customCamerasBarView
+                // Custom Cameras ahora van integradas al final de este mismo carrusel sin ocupar otra fila arriba
                 filmCarouselView
                 bottomShutterBarView
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            // Ahorro total de batería: apaga sensor, acelerómetro y animaciones al salir de la app
             camera.setAppForegroundState(newPhase == .active)
         }
         .alert("Guardar Custom Camera", isPresented: $showSavePresetAlert) {
@@ -2654,7 +3256,7 @@ struct ContentView: View {
                 newPresetName = ""
             }
         } message: {
-            Text("Se guardará esta cámara con todos tus ajustes actuales de exposición, curvas y R-G-B para futuras sesiones.")
+            Text("Aparecerá al final de la lista de cámaras y se conservará entre sesiones.")
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let item = newItem else { return }
@@ -2699,7 +3301,6 @@ struct ContentView: View {
                     .clipShape(Capsule())
             }
             
-            // Botón Rápido DUAL (Toca para activar/desactivar, o abre el selector de 2da cámara)
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 camera.dualCaptureEnabled.toggle()
@@ -2752,7 +3353,17 @@ struct ContentView: View {
                         .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(camera.filtersEnabled ? .white.opacity(0.95) : .yellow)
                     
-                    if camera.timerSeconds > 0 {
+                    if camera.filmRollModeEnabled {
+                        Text("\(camera.filmRollShotsData.count)/\(camera.filmRollCapacity)")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange)
+                            .clipShape(Capsule())
+                    } else if camera.timerSeconds > 0 {
                         Text("\(camera.timerSeconds)s")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .lineLimit(1)
@@ -2836,9 +3447,9 @@ struct ContentView: View {
     
     private var viewfinderSection: some View {
         GeometryReader { outerGeo in
-            let sideMargin: CGFloat = 36.0
+            let sideMargin: CGFloat = 32.0
             let availW = max(100, outerGeo.size.width - sideMargin)
-            let availH = max(100, outerGeo.size.height - 6)
+            let availH = max(100, outerGeo.size.height - 4)
             let targetRatio = camera.aspectRatio.portraitRatio
             let frameW = min(availW, availH * targetRatio)
             let frameH = min(availH, frameW / targetRatio)
@@ -2857,6 +3468,9 @@ struct ContentView: View {
                         filterEnabled: camera.filtersEnabled,
                         isAppActive: camera.isAppInForeground,
                         portraitDepthBlur: camera.portraitDepthBlur,
+                        actionPanEnabled: camera.actionPanEnabled,
+                        actionPanIntensity: camera.actionPanIntensity,
+                        isSuper8Recording: camera.isRecordingSuper8,
                         lightLeakEnabled: camera.lightLeakEnabled,
                         lightLeakIntensity: camera.lightLeakIntensity,
                         anamorphicMode: camera.anamorphicMode,
@@ -2907,23 +3521,28 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.white.opacity(0.20), lineWidth: 0.9)
+                        .stroke(camera.isRecordingSuper8 ? Color.red : Color.white.opacity(0.20), lineWidth: camera.isRecordingSuper8 ? 2.2 : 0.9)
                 )
                 .shadow(color: .black.opacity(0.5), radius: 12)
                 .animation(.spring(response: 0.35, dampingFraction: 0.85), value: camera.aspectRatio)
                 
                 VStack {
                     HStack(spacing: 6) {
+                        if camera.isRecordingSuper8 {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 8, height: 8)
+                        }
                         Text("\(camera.filtersEnabled ? camera.selectedProfile.rawValue : "Normal") • \(camera.statusMessage)")
                             .font(.system(size: 10, weight: .semibold, design: .monospaced))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(.white.opacity(0.92))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Capsule())
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
                     .padding(.top, 12)
                     
                     Spacer()
@@ -2990,7 +3609,7 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Panel Visual de Herramientas (Incluye Selector de 2da Cámara en Modo DUAL)
+    // MARK: - Panel Visual de Herramientas (Con Acción Pan, Carrete Real 12 Exp, Super 8 y Polvo/Film Burn)
     private var interactiveToolsPanelView: some View {
         VStack(spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -3032,8 +3651,121 @@ struct ContentView: View {
             
             Group {
                 switch selectedTool {
+                case .actionPan:
+                    // CÁMARA DE ACCIÓN / BARRIDO (Panning & Long Exposure)
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Button {
+                                camera.actionPanEnabled.toggle()
+                                camera.updateNightModeHardware()
+                            } label: {
+                                Text(camera.actionPanEnabled ? "PANNING: ON" : "PANNING: OFF")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(camera.actionPanEnabled ? Color.yellow : Color.white.opacity(0.14))
+                                    .foregroundStyle(camera.actionPanEnabled ? .black : .white)
+                                    .clipShape(Capsule())
+                            }
+                            
+                            ForEach(ActionPanStyle.allCases, id: \.self) { style in
+                                Button {
+                                    camera.actionPanStyle = style
+                                    camera.actionPanEnabled = true
+                                    camera.updateNightModeHardware()
+                                } label: {
+                                    Text(style.rawValue)
+                                        .font(.system(size: 9.5, weight: .semibold))
+                                        .lineLimit(1)
+                                        .fixedSize(horizontal: true, vertical: false)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 5)
+                                        .background(camera.actionPanStyle == style && camera.actionPanEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                        .foregroundStyle(camera.actionPanStyle == style && camera.actionPanEnabled ? .black : .white)
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+                        
+                        glassSliderRow(
+                            title: "VELOCIDAD",
+                            value: Binding(
+                                get: { camera.actionPanIntensity },
+                                set: { val in
+                                    camera.actionPanIntensity = val
+                                    camera.actionPanEnabled = val > 0.05
+                                    camera.updateNightModeHardware()
+                                }
+                            ),
+                            range: 0.0...1.0,
+                            text: "\(Int(camera.actionPanIntensity * 100))%"
+                        )
+                    }
+                    
+                case .filmRoll:
+                    // MODO CARRETE REAL (12 Exposiciones ocultas + Hoja de Contacto automática)
+                    HStack(spacing: 10) {
+                        Button {
+                            camera.filmRollModeEnabled.toggle()
+                            camera.updateStatusBadge()
+                        } label: {
+                            Text(camera.filmRollModeEnabled ? "CARRETE: ON" : "CARRETE: OFF")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(camera.filmRollModeEnabled ? Color.orange : Color.white.opacity(0.14))
+                                .foregroundStyle(camera.filmRollModeEnabled ? .black : .white)
+                                .clipShape(Capsule())
+                        }
+                        
+                        Text("Tomas: \(camera.filmRollShotsData.count)/\(camera.filmRollCapacity)")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                        
+                        Spacer()
+                        
+                        if !camera.filmRollShotsData.isEmpty {
+                            Button {
+                                camera.developCurrentFilmRollNow()
+                            } label: {
+                                Text(camera.isDevelopingRoll ? "..." : "Revelar Ahora")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(camera.selectedProfile.badgeColor)
+                                    .foregroundStyle(.black)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    
+                case .super8:
+                    // MOTOR DE VIDEO CORTO SUPER 8 / 16MM
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("MOTOR VIDEO SUPER 8 (18 FPS + JITTER)")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white)
+                            Text("O mantén presionado el botón de disparo")
+                                .font(.system(size: 8.5))
+                                .foregroundStyle(.white.opacity(0.65))
+                        }
+                        Spacer()
+                        Button {
+                            camera.super8ModeEnabled.toggle()
+                            camera.updateStatusBadge()
+                        } label: {
+                            Text(camera.super8ModeEnabled ? "MODO S8: ON" : "ACTIVAR S8")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(camera.super8ModeEnabled ? Color.red : Color.white.opacity(0.14))
+                                .foregroundStyle(.white)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    
                 case .dualCam:
-                    // Selector de Cámara Dual: Foto 1 siempre es la cámara actual fija; Foto 2 es elegible (por defecto Normal)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Button {
@@ -3077,6 +3809,23 @@ struct ContentView: View {
                                 }
                             }
                         }
+                    }
+                    
+                case .dustBurn:
+                    // POLVO, RAYONES DE CELULOIDE Y QUEMADURA DE FIN DE ROLLO (Film Burn)
+                    VStack(spacing: 8) {
+                        glassSliderRow(
+                            title: "POLVO/RAYAS",
+                            value: $camera.params.dustAndScratches,
+                            range: 0.0...1.0,
+                            text: "\(Int(camera.params.dustAndScratches * 100))%"
+                        )
+                        glassSliderRow(
+                            title: "FILM BURN",
+                            value: $camera.params.filmBurnAmount,
+                            range: 0.0...1.0,
+                            text: "\(Int(camera.params.filmBurnAmount * 100))%"
+                        )
                     }
                     
                 case .timer:
@@ -3159,35 +3908,9 @@ struct ContentView: View {
                             .foregroundStyle(camera.selectedProfile.badgeColor)
                     }
                     
-                case .lightLeak:
-                    HStack(spacing: 10) {
-                        Button {
-                            camera.lightLeakEnabled.toggle()
-                        } label: {
-                            Text(camera.lightLeakEnabled ? "LEAK: ON" : "LEAK: OFF")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(camera.lightLeakEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.lightLeakEnabled ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                        Slider(value: Binding(
-                            get: { camera.lightLeakIntensity },
-                            set: { val in
-                                camera.lightLeakIntensity = val
-                                camera.lightLeakEnabled = val > 0.05
-                            }
-                        ), in: 0.0...1.0)
-                        .tint(camera.selectedProfile.badgeColor)
-                        Text("\(Int(camera.lightLeakIntensity * 100))%")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(camera.selectedProfile.badgeColor)
-                    }
-                    
                 case .dateStamp:
                     HStack {
-                        Text("FECHADOR CUARZO ('26 11 13)")
+                        Text("FECHADOR CUARZO ('26 11 14)")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.85))
                         Spacer()
@@ -3274,12 +3997,15 @@ struct ContentView: View {
     
     private func isToolActive(_ tool: QuickToolItem) -> Bool {
         switch tool {
+        case .actionPan: return camera.actionPanEnabled
+        case .filmRoll: return camera.filmRollModeEnabled
+        case .super8: return camera.super8ModeEnabled || camera.isRecordingSuper8
         case .dualCam: return camera.dualCaptureEnabled
+        case .dustBurn: return camera.params.dustAndScratches > 0.03 || camera.params.filmBurnAmount > 0.03
         case .timer: return camera.timerSeconds > 0
         case .night: return camera.params.nightMode
         case .portrait: return camera.portraitDepthBlur > 0.05
         case .doubleExp: return camera.doubleExposureEnabled
-        case .lightLeak: return camera.lightLeakEnabled
         case .dateStamp: return camera.dateStampEnabled
         case .anamorphic: return camera.anamorphicMode
         case .horizon: return camera.showHorizonAndHistogram
@@ -3288,9 +4014,26 @@ struct ContentView: View {
     
     private func toggleToolDirectly(_ tool: QuickToolItem) {
         switch tool {
+        case .actionPan:
+            camera.actionPanEnabled.toggle()
+            camera.updateNightModeHardware()
+        case .filmRoll:
+            camera.filmRollModeEnabled.toggle()
+            camera.updateStatusBadge()
+        case .super8:
+            camera.super8ModeEnabled.toggle()
+            camera.updateStatusBadge()
         case .dualCam:
             camera.dualCaptureEnabled.toggle()
             camera.updateStatusBadge()
+        case .dustBurn:
+            if camera.params.dustAndScratches > 0.03 || camera.params.filmBurnAmount > 0.03 {
+                camera.params.dustAndScratches = 0.0
+                camera.params.filmBurnAmount = 0.0
+            } else {
+                camera.params.dustAndScratches = 0.35
+                camera.params.filmBurnAmount = 0.25
+            }
         case .timer: camera.timerSeconds = (camera.timerSeconds == 0) ? 3 : 0
         case .night:
             camera.params.nightMode.toggle()
@@ -3300,14 +4043,13 @@ struct ContentView: View {
             camera.doubleExposureEnabled.toggle()
             if !camera.doubleExposureEnabled { camera.doubleExposureFirstShot = nil }
             camera.updateStatusBadge()
-        case .lightLeak: camera.lightLeakEnabled.toggle()
         case .dateStamp: camera.dateStampEnabled.toggle()
         case .anamorphic: camera.anamorphicMode.toggle()
         case .horizon: camera.showHorizonAndHistogram.toggle()
         }
     }
     
-    // MARK: - Cajón de Ajustes (Incluye Pestaña RGB activa incluso en Cámara Normal + Botón Guardar Custom Camera)
+    // MARK: - Cajón de Ajustes
     private var controlsDrawerView: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
@@ -3352,14 +4094,13 @@ struct ContentView: View {
                             trayTabPill(index: 1, title: "RGB")
                             trayTabPill(index: 2, title: "Split")
                             trayTabPill(index: 3, title: "HSL")
-                            trayTabPill(index: 4, title: "Optics")
+                            trayTabPill(index: 4, title: "Celuloide")
                         }
                     }
                 } else {
                     Spacer()
                 }
                 
-                // Botón para Guardar la configuración actual en "Custom Cameras"
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     showSavePresetAlert = true
@@ -3459,7 +4200,6 @@ struct ContentView: View {
                     
                     glassSliderRow(title: "SKY COMP", value: $camera.params.skyCompression, range: 0.0...1.0, text: "\(Int(camera.params.skyCompression * 100))%")
                 } else if activeDrawerTab == 1 {
-                    // Pestaña R-G-B (Funciona tanto en todas las películas como en la cámara Normal)
                     glassSliderRow(title: "RED (R)", value: $camera.params.redTrim, range: -0.6...0.6, text: String(format: "%+.2f", camera.params.redTrim))
                     
                     glassSliderRow(title: "GREEN (G)", value: $camera.params.greenTrim, range: -0.6...0.6, text: String(format: "%+.2f", camera.params.greenTrim))
@@ -3486,11 +4226,11 @@ struct ContentView: View {
                 } else {
                     glassSliderRow(title: "HALATION", value: $camera.params.bloom, range: 0.0...1.0, text: "\(Int(camera.params.bloom * 100))%")
                     
-                    glassSliderRow(title: "SOFT MIST", value: $camera.params.softMist, range: 0.0...1.0, text: "\(Int(camera.params.softMist * 100))%")
-                    
                     glassSliderRow(title: "GRANO 35MM", value: $camera.params.grain, range: 0.0...1.0, text: "\(Int(camera.params.grain * 100))%")
                     
-                    glassSliderRow(title: "VIÑETEADO", value: $camera.params.vignette, range: 0.0...1.0, text: "\(Int(camera.params.vignette * 100))%")
+                    glassSliderRow(title: "POLVO/RAYAS", value: $camera.params.dustAndScratches, range: 0.0...1.0, text: "\(Int(camera.params.dustAndScratches * 100))%")
+                    
+                    glassSliderRow(title: "FILM BURN", value: $camera.params.filmBurnAmount, range: 0.0...1.0, text: "\(Int(camera.params.filmBurnAmount * 100))%")
                 }
             }
         }
@@ -3502,66 +4242,11 @@ struct ContentView: View {
         .padding(.horizontal, 24)
     }
     
-    // MARK: - Apartado de Custom Cameras (Persistentes entre sesiones)
-    @ViewBuilder
-    private var customCamerasBarView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showSavePresetAlert = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("Guardar Custom")
-                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                    .foregroundStyle(.yellow)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 5)
-                    .background(Color.yellow.opacity(0.14))
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.yellow.opacity(0.4), lineWidth: 0.6))
-                }
-                
-                ForEach(camera.customPresets) { preset in
-                    let isSelected = (camera.activeCustomPresetID == preset.id)
-                    Button {
-                        camera.applyCustomPreset(preset)
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 9))
-                            Text(preset.name)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .foregroundStyle(isSelected ? .black : .white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(isSelected ? Color.yellow : Color.white.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            camera.deleteCustomPreset(preset)
-                        } label: {
-                            Label("Eliminar Custom Camera", systemImage: "trash")
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-        }
-    }
-    
+    // MARK: - Carrusel Único: Las 18 Cámaras + Custom Cameras al Final (Sin sobrecargar la pantalla con dos barras)
     private var filmCarouselView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                // 1. Las 18 cámaras integradas
                 ForEach(FilmProfile.allCases) { profile in
                     let isSelected = (camera.selectedProfile == profile && camera.activeCustomPresetID == nil)
                     Button {
@@ -3589,11 +4274,76 @@ struct ContentView: View {
                         )
                     }
                 }
+                
+                // 2. Separador sutil y sección de Custom Cameras justo al final de la misma fila
+                Rectangle()
+                    .fill(Color.white.opacity(0.20))
+                    .frame(width: 1, height: 20)
+                    .padding(.horizontal, 2)
+                
+                ForEach(camera.customPresets) { preset in
+                    let isSelected = (camera.activeCustomPresetID == preset.id)
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                            camera.applyCustomPreset(preset)
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 9))
+                            Text(preset.name)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .foregroundStyle(isSelected ? .black : .yellow)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(isSelected ? Color.yellow : Color.yellow.opacity(0.14))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.yellow.opacity(isSelected ? 0.0 : 0.35), lineWidth: 0.6)
+                        )
+                    }
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            camera.deleteCustomPreset(preset)
+                        } label: {
+                            Label("Eliminar Custom Camera", systemImage: "trash")
+                        }
+                    }
+                }
+                
+                // Botón para añadir una nueva Custom Camera al final de la fila
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showSavePresetAlert = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Custom")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.10))
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.25), lineWidth: 0.6)
+                    )
+                }
             }
             .padding(.horizontal, 16)
         }
     }
     
+    // MARK: - Barra de Obturador (Toque = Foto | Mantener presionado o Modo S8 = Video Super 8)
     private var bottomShutterBarView: some View {
         HStack {
             Button {
@@ -3613,9 +4363,9 @@ struct ContentView: View {
                         .fill(.ultraThinMaterial)
                         .frame(width: 52, height: 52)
                         .overlay(
-                            Image(systemName: "photo.on.rectangle")
+                            Image(systemName: camera.filmRollModeEnabled ? "film.stack" : "photo.on.rectangle")
                                 .font(.system(size: 18))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(camera.filmRollModeEnabled ? .orange : .white.opacity(0.6))
                         )
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.14), lineWidth: 0.6))
                 }
@@ -3625,19 +4375,25 @@ struct ContentView: View {
             
             Spacer()
             
-            Button {
+            // Obturador Híbrido: Toca para Foto / Acción / Carrete, o mantén presionado para grabar clip Super 8
+            ZStack {
+                Circle()
+                    .stroke(camera.isRecordingSuper8 || camera.super8ModeEnabled ? Color.red : camera.selectedProfile.badgeColor, lineWidth: 3.5)
+                    .frame(width: 76, height: 76)
+                
+                RoundedRectangle(cornerRadius: camera.isRecordingSuper8 ? 10 : 32, style: .continuous)
+                    .fill(camera.isRecordingSuper8 ? Color.red : (camera.isProcessing ? camera.selectedProfile.badgeColor : Color.white))
+                    .frame(width: camera.isRecordingSuper8 ? 34 : 64, height: camera.isRecordingSuper8 ? 34 : 64)
+                    .scaleEffect(camera.isProcessing ? 0.88 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: camera.isRecordingSuper8)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: camera.isProcessing)
+            }
+            .contentShape(Circle())
+            .onTapGesture {
                 camera.triggerShutter()
-            } label: {
-                ZStack {
-                    Circle()
-                        .stroke(camera.selectedProfile.badgeColor, lineWidth: 3.5)
-                        .frame(width: 76, height: 76)
-                    Circle()
-                        .fill(camera.isProcessing ? camera.selectedProfile.badgeColor : Color.white)
-                        .frame(width: 64, height: 64)
-                        .scaleEffect(camera.isProcessing ? 0.88 : 1.0)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: camera.isProcessing)
-                }
+            }
+            .onLongPressGesture(minimumDuration: 0.45) {
+                camera.toggleSuper8Recording()
             }
             .disabled(camera.isProcessing)
             
