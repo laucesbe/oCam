@@ -1184,7 +1184,7 @@ class CinematicPipeline {
     }
 }
 
-// MARK: - 4. Controlador de Hardware oCam (Con Carrete Real 12 Exp, Acción/Barrido y Video Super 8 a 18 FPS)
+// MARK: - 4. Controlador de Hardware oCam
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
     let session = AVCaptureSession()
@@ -1668,7 +1668,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         }
     }
     
-    // MARK: - Grabación de Video Corto "Super 8 / 16mm" (Cadencia física de 18 FPS en el sensor)
+    // MARK: - Grabación de Video Corto "Super 8 / 16mm" (Con nombres exactos minFrameRate / maxFrameRate de AVFoundation)
     func toggleSuper8Recording() {
         if isRecordingSuper8 {
             stopSuper8Recording()
@@ -1704,12 +1704,11 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
                 }
                 self.session.commitConfiguration()
                 
-                // Configurar cadencia real de proyector Super 8 (18 FPS) en el sensor cuando es soportado
                 do {
                     try dev.lockForConfiguration()
                     let fps18 = CMTimeMake(value: 1, timescale: 18)
                     for range in dev.activeFormat.videoSupportedFrameRateRanges {
-                        if range.minFramerate <= 18.0 && range.maxFramerate >= 18.0 {
+                        if range.minFrameRate <= 18.0 && range.maxFrameRate >= 18.0 {
                             dev.activeVideoMinFrameDuration = fps18
                             dev.activeVideoMaxFrameDuration = fps18
                             break
@@ -2796,7 +2795,6 @@ struct GalleryDarkroomView: View {
         }
     }
     
-    // MARK: - Procesamiento en Lote libre de advertencias de concurrencia en Swift 6
     private func runBatchProcessing(items: [PhotosPickerItem]) {
         isBatchProcessing = true
         let total = items.count
@@ -3550,339 +3548,7 @@ struct ContentView: View {
             
             Divider().background(Color.white.opacity(0.15))
             
-            Group {
-                switch selectedTool {
-                case .actionPan:
-                    VStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            Button {
-                                camera.actionPanEnabled.toggle()
-                                camera.updateNightModeHardware()
-                            } label: {
-                                Text(camera.actionPanEnabled ? "PANNING: ON" : "PANNING: OFF")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(camera.actionPanEnabled ? Color.yellow : Color.white.opacity(0.14))
-                                    .foregroundStyle(camera.actionPanEnabled ? .black : .white)
-                                    .clipShape(Capsule())
-                            }
-                            
-                            ForEach(ActionPanStyle.allCases, id: \.self) { style in
-                                Button {
-                                    camera.actionPanStyle = style
-                                    camera.actionPanEnabled = true
-                                    camera.updateNightModeHardware()
-                                } label: {
-                                    Text(style.rawValue)
-                                        .font(.system(size: 9.5, weight: .semibold))
-                                        .lineLimit(1)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 5)
-                                        .background(camera.actionPanStyle == style && camera.actionPanEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                        .foregroundStyle(camera.actionPanStyle == style && camera.actionPanEnabled ? .black : .white)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                        }
-                        
-                        glassSliderRow(
-                            title: "VELOCIDAD",
-                            value: Binding(
-                                get: { camera.actionPanIntensity },
-                                set: { val in
-                                    camera.actionPanIntensity = val
-                                    camera.actionPanEnabled = val > 0.05
-                                    camera.updateNightModeHardware()
-                                }
-                            ),
-                            range: 0.0...1.0,
-                            text: "\(Int(camera.actionPanIntensity * 100))%"
-                        )
-                    }
-                    
-                case .filmRoll:
-                    HStack(spacing: 10) {
-                        Button {
-                            camera.filmRollModeEnabled.toggle()
-                            camera.updateStatusBadge()
-                        } label: {
-                            Text(camera.filmRollModeEnabled ? "CARRETE: ON" : "CARRETE: OFF")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(camera.filmRollModeEnabled ? Color.orange : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.filmRollModeEnabled ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                        
-                        Text("Tomas: \(camera.filmRollShotsData.count)/\(camera.filmRollCapacity)")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white)
-                        
-                        Spacer()
-                        
-                        if !camera.filmRollShotsData.isEmpty {
-                            Button {
-                                camera.developCurrentFilmRollNow()
-                            } label: {
-                                Text(camera.isDevelopingRoll ? "..." : "Revelar Ahora")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(camera.selectedProfile.badgeColor)
-                                    .foregroundStyle(.black)
-                                    .clipShape(Capsule())
-                            }
-                        }
-                    }
-                    
-                case .super8:
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("MOTOR VIDEO SUPER 8 (18 FPS REALES)")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.white)
-                            Text("O mantén presionado el botón de disparo")
-                                .font(.system(size: 8.5))
-                                .foregroundStyle(.white.opacity(0.65))
-                        }
-                        Spacer()
-                        Button {
-                            camera.super8ModeEnabled.toggle()
-                            camera.updateStatusBadge()
-                        } label: {
-                            Text(camera.super8ModeEnabled ? "MODO S8: ON" : "ACTIVAR S8")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(camera.super8ModeEnabled ? Color.red : Color.white.opacity(0.14))
-                                .foregroundStyle(.white)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    
-                case .dualCam:
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Button {
-                                camera.dualCaptureEnabled.toggle()
-                                camera.updateStatusBadge()
-                            } label: {
-                                Text(camera.dualCaptureEnabled ? "DUAL: ACTIVO" : "DUAL: OFF")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(camera.dualCaptureEnabled ? Color.yellow : Color.white.opacity(0.14))
-                                    .foregroundStyle(camera.dualCaptureEnabled ? .black : .white)
-                                    .clipShape(Capsule())
-                            }
-                            Spacer()
-                            Text("1ª: \(camera.selectedProfile.rawValue) (Fija) + 2ª: \(camera.dualSecondaryProfile.rawValue)")
-                                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                .lineLimit(1)
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(FilmProfile.allCases) { prof in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        camera.dualSecondaryProfile = prof
-                                        camera.dualCaptureEnabled = true
-                                        camera.updateStatusBadge()
-                                    } label: {
-                                        Text("2ª: \(prof.rawValue)")
-                                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                            .lineLimit(1)
-                                            .fixedSize(horizontal: true, vertical: false)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 5)
-                                            .background(camera.dualSecondaryProfile == prof ? prof.badgeColor : Color.white.opacity(0.12))
-                                            .foregroundStyle(camera.dualSecondaryProfile == prof ? .black : .white)
-                                            .clipShape(Capsule())
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                case .dustBurn:
-                    VStack(spacing: 8) {
-                        glassSliderRow(
-                            title: "POLVO/RAYAS",
-                            value: $camera.params.dustAndScratches,
-                            range: 0.0...1.0,
-                            text: "\(Int(camera.params.dustAndScratches * 100))%"
-                        )
-                        glassSliderRow(
-                            title: "FILM BURN",
-                            value: $camera.params.filmBurnAmount,
-                            range: 0.0...1.0,
-                            text: "\(Int(camera.params.filmBurnAmount * 100))%"
-                        )
-                    }
-                    
-                case .timer:
-                    HStack(spacing: 8) {
-                        Text("TEMPORIZADOR")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.8))
-                        Spacer()
-                        ForEach([0, 3, 10], id: \.self) { sec in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                camera.timerSeconds = sec
-                            } label: {
-                                Text(sec == 0 ? "OFF" : "\(sec)s")
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 6)
-                                    .background(camera.timerSeconds == sec ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
-                                    .foregroundStyle(camera.timerSeconds == sec ? .black : .white)
-                                    .clipShape(Capsule())
-                            }
-                        }
-                    }
-                    
-                case .night:
-                    HStack(spacing: 10) {
-                        Button {
-                            camera.params.nightMode.toggle()
-                            camera.updateNightModeHardware()
-                        } label: {
-                            Text(camera.params.nightMode ? "NOCHE: ON" : "NOCHE: OFF")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(camera.params.nightMode ? Color.yellow : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.params.nightMode ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                        Slider(value: Binding(
-                            get: { camera.nightExposureSeconds },
-                            set: { newVal in
-                                camera.nightExposureSeconds = newVal
-                                camera.params.nightMode = true
-                                camera.updateNightModeHardware()
-                            }
-                        ), in: 0.05...0.25)
-                        .tint(.yellow)
-                        Text(String(format: "%.2fs", camera.nightExposureSeconds))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.yellow)
-                    }
-                    
-                case .portrait:
-                    glassSliderRow(
-                        title: "APERTURA f/",
-                        value: $camera.portraitDepthBlur,
-                        range: 0.0...1.0,
-                        text: camera.portraitDepthBlur < 0.05 ? "OFF" : String(format: "f/%.1f", 2.8 - (camera.portraitDepthBlur * 1.6))
-                    )
-                    
-                case .doubleExp:
-                    HStack(spacing: 10) {
-                        Button {
-                            camera.doubleExposureEnabled.toggle()
-                            if !camera.doubleExposureEnabled { camera.doubleExposureFirstShot = nil }
-                            camera.updateStatusBadge()
-                        } label: {
-                            Text(camera.doubleExposureEnabled ? "2X: ACTIVO" : "2X: OFF")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(camera.doubleExposureEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.doubleExposureEnabled ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                        Slider(value: $camera.doubleExposureOpacity, in: 0.25...0.85)
-                            .tint(camera.selectedProfile.badgeColor)
-                        Text("\(Int(camera.doubleExposureOpacity * 100))%")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(camera.selectedProfile.badgeColor)
-                    }
-                    
-                case .dateStamp:
-                    HStack {
-                        Text("FECHADOR CUARZO ('26 11 14)")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.85))
-                        Spacer()
-                        Button {
-                            camera.dateStampEnabled.toggle()
-                        } label: {
-                            Text(camera.dateStampEnabled ? "ACTIVO" : "DESACTIVADO")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(camera.dateStampEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.dateStampEnabled ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    
-                case .anamorphic:
-                    HStack {
-                        Text("LENTE ANAMÓRFICO + FLARE AZUL")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.85))
-                        Spacer()
-                        Button {
-                            camera.anamorphicMode.toggle()
-                            if camera.anamorphicMode { camera.aspectRatio = .anamorphic }
-                        } label: {
-                            Text(camera.anamorphicMode ? "ACTIVO" : "DESACTIVADO")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(camera.anamorphicMode ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.anamorphicMode ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    
-                case .horizon:
-                    HStack(spacing: 8) {
-                        Button {
-                            camera.showGrid.toggle()
-                        } label: {
-                            Label(camera.showGrid ? "Grid: ON" : "Grid: OFF", systemImage: "squareshape.split.3x3")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(camera.showGrid ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.showGrid ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                        Button {
-                            camera.showHorizonAndHistogram.toggle()
-                        } label: {
-                            Label(camera.showHorizonAndHistogram ? "Nivel: ON" : "Nivel: OFF", systemImage: "level")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(camera.showHorizonAndHistogram ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
-                                .foregroundStyle(camera.showHorizonAndHistogram ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                        Button {
-                            camera.filtersEnabled.toggle()
-                            camera.updateStatusBadge()
-                        } label: {
-                            Text(camera.filtersEnabled ? "Filtro: ON" : "Sin Filtro")
-                                .font(.system(size: 10, weight: .bold))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(!camera.filtersEnabled ? Color.yellow : Color.white.opacity(0.14))
-                                .foregroundStyle(!camera.filtersEnabled ? .black : .white)
-                                .clipShape(Capsule())
-                        }
-                    }
-                }
-            }
+            activeToolControlView(for: selectedTool)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -3890,6 +3556,341 @@ struct ContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.18), lineWidth: 0.7))
         .padding(.horizontal, 24)
+    }
+    
+    @ViewBuilder
+    private func activeToolControlView(for tool: QuickToolItem) -> some View {
+        switch tool {
+        case .actionPan:
+            VStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Button {
+                        camera.actionPanEnabled.toggle()
+                        camera.updateNightModeHardware()
+                    } label: {
+                        Text(camera.actionPanEnabled ? "PANNING: ON" : "PANNING: OFF")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(camera.actionPanEnabled ? Color.yellow : Color.white.opacity(0.14))
+                            .foregroundStyle(camera.actionPanEnabled ? .black : .white)
+                            .clipShape(Capsule())
+                    }
+                    
+                    ForEach(ActionPanStyle.allCases, id: \.self) { style in
+                        Button {
+                            camera.actionPanStyle = style
+                            camera.actionPanEnabled = true
+                            camera.updateNightModeHardware()
+                        } label: {
+                            Text(style.rawValue)
+                                .font(.system(size: 9.5, weight: .semibold))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(camera.actionPanStyle == style && camera.actionPanEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                                .foregroundStyle(camera.actionPanStyle == style && camera.actionPanEnabled ? .black : .white)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                
+                glassSliderRow(
+                    title: "VELOCIDAD",
+                    value: Binding(
+                        get: { camera.actionPanIntensity },
+                        set: { val in
+                            camera.actionPanIntensity = val
+                            camera.actionPanEnabled = val > 0.05
+                            camera.updateNightModeHardware()
+                        }
+                    ),
+                    range: 0.0...1.0,
+                    text: "\(Int(camera.actionPanIntensity * 100))%"
+                )
+            }
+            
+        case .filmRoll:
+            HStack(spacing: 10) {
+                Button {
+                    camera.filmRollModeEnabled.toggle()
+                    camera.updateStatusBadge()
+                } label: {
+                    Text(camera.filmRollModeEnabled ? "CARRETE: ON" : "CARRETE: OFF")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(camera.filmRollModeEnabled ? Color.orange : Color.white.opacity(0.14))
+                        .foregroundStyle(camera.filmRollModeEnabled ? .black : .white)
+                        .clipShape(Capsule())
+                }
+                
+                Text("Tomas: \(camera.filmRollShotsData.count)/\(camera.filmRollCapacity)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                if !camera.filmRollShotsData.isEmpty {
+                    Button {
+                        camera.developCurrentFilmRollNow()
+                    } label: {
+                        Text(camera.isDevelopingRoll ? "..." : "Revelar Ahora")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(camera.selectedProfile.badgeColor)
+                            .foregroundStyle(.black)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            
+        case .super8:
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("MOTOR VIDEO SUPER 8 (18 FPS REALES)")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text("O mantén presionado el botón de disparo")
+                        .font(.system(size: 8.5))
+                        .foregroundStyle(.white.opacity(0.65))
+                }
+                Spacer()
+                Button {
+                    camera.super8ModeEnabled.toggle()
+                    camera.updateStatusBadge()
+                } label: {
+                    Text(camera.super8ModeEnabled ? "MODO S8: ON" : "ACTIVAR S8")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(camera.super8ModeEnabled ? Color.red : Color.white.opacity(0.14))
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+                }
+            }
+            
+        case .dualCam:
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Button {
+                        camera.dualCaptureEnabled.toggle()
+                        camera.updateStatusBadge()
+                    } label: {
+                        Text(camera.dualCaptureEnabled ? "DUAL: ACTIVO" : "DUAL: OFF")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(camera.dualCaptureEnabled ? Color.yellow : Color.white.opacity(0.14))
+                            .foregroundStyle(camera.dualCaptureEnabled ? .black : .white)
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                    Text("1ª: \(camera.selectedProfile.rawValue) (Fija) + 2ª: \(camera.dualSecondaryProfile.rawValue)")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .lineLimit(1)
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(FilmProfile.allCases) { prof in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                camera.dualSecondaryProfile = prof
+                                camera.dualCaptureEnabled = true
+                                camera.updateStatusBadge()
+                            } label: {
+                                Text("2ª: \(prof.rawValue)")
+                                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(camera.dualSecondaryProfile == prof ? prof.badgeColor : Color.white.opacity(0.12))
+                                    .foregroundStyle(camera.dualSecondaryProfile == prof ? .black : .white)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
+            }
+            
+        case .dustBurn:
+            VStack(spacing: 8) {
+                glassSliderRow(
+                    title: "POLVO/RAYAS",
+                    value: $camera.params.dustAndScratches,
+                    range: 0.0...1.0,
+                    text: "\(Int(camera.params.dustAndScratches * 100))%"
+                )
+                glassSliderRow(
+                    title: "FILM BURN",
+                    value: $camera.params.filmBurnAmount,
+                    range: 0.0...1.0,
+                    text: "\(Int(camera.params.filmBurnAmount * 100))%"
+                )
+            }
+            
+        case .timer:
+            HStack(spacing: 8) {
+                Text("TEMPORIZADOR")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                ForEach([0, 3, 10], id: \.self) { sec in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        camera.timerSeconds = sec
+                    } label: {
+                        Text(sec == 0 ? "OFF" : "\(sec)s")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(camera.timerSeconds == sec ? camera.selectedProfile.badgeColor : Color.white.opacity(0.12))
+                            .foregroundStyle(camera.timerSeconds == sec ? .black : .white)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            
+        case .night:
+            HStack(spacing: 10) {
+                Button {
+                    camera.params.nightMode.toggle()
+                    camera.updateNightModeHardware()
+                } label: {
+                    Text(camera.params.nightMode ? "NOCHE: ON" : "NOCHE: OFF")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(camera.params.nightMode ? Color.yellow : Color.white.opacity(0.14))
+                        .foregroundStyle(camera.params.nightMode ? .black : .white)
+                        .clipShape(Capsule())
+                }
+                Slider(value: Binding(
+                    get: { camera.nightExposureSeconds },
+                    set: { newVal in
+                        camera.nightExposureSeconds = newVal
+                        camera.params.nightMode = true
+                        camera.updateNightModeHardware()
+                    }
+                ), in: 0.05...0.25)
+                .tint(.yellow)
+                Text(String(format: "%.2fs", camera.nightExposureSeconds))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.yellow)
+            }
+            
+        case .portrait:
+            glassSliderRow(
+                title: "APERTURA f/",
+                value: $camera.portraitDepthBlur,
+                range: 0.0...1.0,
+                text: camera.portraitDepthBlur < 0.05 ? "OFF" : String(format: "f/%.1f", 2.8 - (camera.portraitDepthBlur * 1.6))
+            )
+            
+        case .doubleExp:
+            HStack(spacing: 10) {
+                Button {
+                    camera.doubleExposureEnabled.toggle()
+                    if !camera.doubleExposureEnabled { camera.doubleExposureFirstShot = nil }
+                    camera.updateStatusBadge()
+                } label: {
+                    Text(camera.doubleExposureEnabled ? "2X: ACTIVO" : "2X: OFF")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(camera.doubleExposureEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                        .foregroundStyle(camera.doubleExposureEnabled ? .black : .white)
+                        .clipShape(Capsule())
+                }
+                Slider(value: $camera.doubleExposureOpacity, in: 0.25...0.85)
+                    .tint(camera.selectedProfile.badgeColor)
+                Text("\(Int(camera.doubleExposureOpacity * 100))%")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(camera.selectedProfile.badgeColor)
+            }
+            
+        case .dateStamp:
+            HStack {
+                Text("FECHADOR CUARZO ('26 11 14)")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                Button {
+                    camera.dateStampEnabled.toggle()
+                } label: {
+                    Text(camera.dateStampEnabled ? "ACTIVO" : "DESACTIVADO")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(camera.dateStampEnabled ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                        .foregroundStyle(camera.dateStampEnabled ? .black : .white)
+                        .clipShape(Capsule())
+                }
+            }
+            
+        case .anamorphic:
+            HStack {
+                Text("LENTE ANAMÓRFICO + FLARE AZUL")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                Button {
+                    camera.anamorphicMode.toggle()
+                    if camera.anamorphicMode { camera.aspectRatio = .anamorphic }
+                } label: {
+                    Text(camera.anamorphicMode ? "ACTIVO" : "DESACTIVADO")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(camera.anamorphicMode ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                        .foregroundStyle(camera.anamorphicMode ? .black : .white)
+                        .clipShape(Capsule())
+                }
+            }
+            
+        case .horizon:
+            HStack(spacing: 8) {
+                Button {
+                    camera.showGrid.toggle()
+                } label: {
+                    Label(camera.showGrid ? "Grid: ON" : "Grid: OFF", systemImage: "squareshape.split.3x3")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(camera.showGrid ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                        .foregroundStyle(camera.showGrid ? .black : .white)
+                        .clipShape(Capsule())
+                }
+                Button {
+                    camera.showHorizonAndHistogram.toggle()
+                } label: {
+                    Label(camera.showHorizonAndHistogram ? "Nivel: ON" : "Nivel: OFF", systemImage: "level")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(camera.showHorizonAndHistogram ? camera.selectedProfile.badgeColor : Color.white.opacity(0.14))
+                        .foregroundStyle(camera.showHorizonAndHistogram ? .black : .white)
+                        .clipShape(Capsule())
+                }
+                Button {
+                    camera.filtersEnabled.toggle()
+                    camera.updateStatusBadge()
+                } label: {
+                    Text(camera.filtersEnabled ? "Filtro: ON" : "Sin Filtro")
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(!camera.filtersEnabled ? Color.yellow : Color.white.opacity(0.14))
+                        .foregroundStyle(!camera.filtersEnabled ? .black : .white)
+                        .clipShape(Capsule())
+                }
+            }
+        }
     }
     
     private func isToolActive(_ tool: QuickToolItem) -> Bool {
