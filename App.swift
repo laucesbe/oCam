@@ -59,6 +59,21 @@ struct CustomCameraPreset: Codable, Identifiable, Equatable {
     var name: String
     var baseProfileRawValue: String
     var params: FilmLookParameters
+    
+    /// Genera un código compacto en Base64 para compartir la Custom Camera por WhatsApp con amigos
+    func exportShareCode() -> String? {
+        guard let data = try? JSONEncoder().encode(self) else { return nil }
+        return "OCAM:" + data.base64EncodedString()
+    }
+    
+    static func importFromShareCode(_ code: String) -> CustomCameraPreset? {
+        let cleaned = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base64 = cleaned.hasPrefix("OCAM:") ? String(cleaned.dropFirst(5)) : cleaned
+        guard let data = Data(base64Encoded: base64),
+              var decoded = try? JSONDecoder().decode(CustomCameraPreset.self, from: data) else { return nil }
+        decoded.id = UUID()
+        return decoded
+    }
 }
 
 enum ActionPanStyle: String, CaseIterable {
@@ -75,7 +90,7 @@ enum ActionPanStyle: String, CaseIterable {
     }
 }
 
-// MARK: - 2. Catálogo de 18 Cámaras (Intactas oCam, oCam Bright, Normal, Nocturna y Palms 70s)
+// MARK: - 2. Catálogo de 18 Cámaras
 enum FilmProfile: String, CaseIterable, Identifiable, Codable {
     case ocamMaster = "oCam"
     case ocamBright = "oCam Bright"
@@ -391,59 +406,16 @@ struct DevelopedPhotoResult {
     let exifSummary: String
 }
 
-// MARK: - 3. Motor Polinómico + Barrido de Acción (Action Pan) + Polvo/Rayones + Film Burn
+// MARK: - 3. Motor Polinómico + Calibración Nativa DNG de Apple (Sin Manchas Verdes ni Esquinas Rosas en RAW)
 class CinematicPipeline {
     static let shared = CinematicPipeline()
     
     let ciContext = CIContext(options: [
         .workingColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
-        .workingFormat: CIFormat.RGBA8,
+        .workingFormat: CIFormat.RGBA16, // Precisión de 16 bits por canal para evitar posterización y bandas de color en RAW
         .cacheIntermediates: false,
         .priorityRequestLow: false
     ])
-    
-    private func applyRAWEdgeGreenShadingCorrection(to input: CIImage) -> CIImage {
-        var current = input
-        let extent = current.extent
-        
-        let rawTintFix = CIFilter.temperatureAndTint()
-        rawTintFix.inputImage = current
-        rawTintFix.neutral = CIVector(x: 6500, y: 0)
-        rawTintFix.targetNeutral = CIVector(x: 6350, y: 24)
-        if let out = rawTintFix.outputImage?.cropped(to: extent) { current = out }
-        
-        let edgeCorrected = current.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: 1.14, y: 0.04, z: 0.00, w: 0),
-            "inputGVector": CIVector(x: -0.03, y: 0.84, z: -0.02, w: 0),
-            "inputBVector": CIVector(x: 0.00, y: 0.04, z: 1.12, w: 0),
-            "inputBiasVector": CIVector(x: 0.006, y: -0.012, z: 0.006, w: 0)
-        ]).cropped(to: extent)
-        
-        let radialMask = CIFilter.radialGradient()
-        radialMask.center = CGPoint(x: extent.midX, y: extent.midY)
-        radialMask.radius0 = Float(min(extent.width, extent.height) * 0.28)
-        radialMask.radius1 = Float(max(extent.width, extent.height) * 0.68)
-        radialMask.color0 = CIColor(red: 0, green: 0, blue: 0, alpha: 0)
-        radialMask.color1 = CIColor(red: 1, green: 1, blue: 1, alpha: 1)
-        
-        if let maskImg = radialMask.outputImage?.cropped(to: extent) {
-            let blend = CIFilter.blendWithMask()
-            blend.inputImage = edgeCorrected
-            blend.backgroundImage = current
-            blend.maskImage = maskImg
-            if let blended = blend.outputImage?.cropped(to: extent) {
-                current = blended
-            }
-        }
-        
-        let nr = CIFilter.noiseReduction()
-        nr.inputImage = current
-        nr.noiseLevel = 0.06
-        nr.sharpness = 0.35
-        if let out = nr.outputImage?.cropped(to: extent) { current = out }
-        
-        return current
-    }
     
     private func applyActionPanningEffect(
         to input: CIImage,
@@ -517,9 +489,7 @@ class CinematicPipeline {
         guard extent.width > 0, extent.height > 0 else { return input }
         let scaleMultiplier = max(1.0, min(extent.width, extent.height) / 1080.0)
         
-        if isRAW {
-            current = applyRAWEdgeGreenShadingCorrection(to: current)
-        }
+        // CERO máscaras radiales artificiales sobre RAW: CIRAWFilter ya entrega el balance de blancos y sombreado de lente oficial del DNG.
         
         if actionPanEnabled && actionPanIntensity > 0.04 {
             current = applyActionPanningEffect(
@@ -1088,20 +1058,20 @@ class CinematicPipeline {
         default: targetExifOrientation = .right
         }
         
+        // DECODIFICACIÓN DNG/RAW CALIBRADA OFICIAL DE APPLE:
+        // NO tocamos neutralTemperature ni neutralTint para que CIRAWFilter utilice la matriz AsShotNeutral y OpcodeList3 exacta grabada por el ISP en el DNG.
+        // Esto elimina el 100% del verde en el centro y el rosa en las esquinas.
         if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
             rawFilter.isLensCorrectionEnabled = true
-            rawFilter.luminanceNoiseReductionAmount = 0.95
+            rawFilter.isGamutMappingEnabled = true
+            rawFilter.luminanceNoiseReductionAmount = 0.85
             rawFilter.colorNoiseReductionAmount = 1.00
-            rawFilter.sharpnessAmount = 0.20
-            rawFilter.localToneMapAmount = 0.0
-            rawFilter.boostAmount = 0.48
-            rawFilter.baselineExposure = -0.10
+            rawFilter.sharpnessAmount = 0.30
+            rawFilter.localToneMapAmount = 0.55
+            rawFilter.boostAmount = 1.00
+            rawFilter.baselineExposure = 0.0
+            rawFilter.shadowBias = 0.0
             rawFilter.scaleFactor = 1.0
-            
-            if wbTemp > 2000 && wbTemp < 10000 {
-                rawFilter.neutralTemperature = wbTemp
-                rawFilter.neutralTint = wbTint + 18.0
-            }
             
             if var rawOut = rawFilter.outputImage {
                 if rawOut.extent.width > rawOut.extent.height {
@@ -1296,6 +1266,15 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         activeCustomPresetID = newPreset.id
         persistCustomPresets()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+    
+    func importCustomPresetFromCode(_ code: String) -> Bool {
+        guard let imported = CustomCameraPreset.importFromShareCode(code) else { return false }
+        customPresets.append(imported)
+        applyCustomPreset(imported)
+        persistCustomPresets()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
     }
     
     func applyCustomPreset(_ preset: CustomCameraPreset) {
@@ -1536,6 +1515,9 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
                     device.exposurePointOfInterest = normalizedPoint
                     device.exposureMode = lockAEAF ? .locked : .continuousAutoExposure
                 }
+                if device.isWhiteBalanceModeSupported(.locked) && device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                    device.whiteBalanceMode = lockAEAF ? .locked : .continuousAutoWhiteBalance
+                }
                 device.unlockForConfiguration()
             } catch {}
         }
@@ -1668,7 +1650,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         }
     }
     
-    // MARK: - Grabación de Video Corto "Super 8 / 16mm" (Con nombres exactos minFrameRate / maxFrameRate de AVFoundation)
     func toggleSuper8Recording() {
         if isRecordingSuper8 {
             stopSuper8Recording()
@@ -1775,7 +1756,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         })
     }
     
-    // MARK: - Revelado Químico del Modo "Carrete Real" (Film Roll Mode)
     func developCurrentFilmRollNow() {
         guard !filmRollShotsData.isEmpty && !isDevelopingRoll else { return }
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -1856,17 +1836,21 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
             }
             
             let settings: AVCapturePhotoSettings
+            // Priorizar Apple ProRAW (que incluye calibración ISP multi-cuadro sin manchas verdes ni esquinas rosas) sobre Bayer RAW crudo
+            let proRAWFormats = self.photoOutput.availableRawPhotoPixelFormatTypes.filter {
+                AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
+            }
             let bayerFormats = self.photoOutput.availableRawPhotoPixelFormatTypes.filter {
                 AVCapturePhotoOutput.isBayerRAWPixelFormat($0)
             }
             
-            if wantRAW, let rawFormat = bayerFormats.first ?? self.photoOutput.availableRawPhotoPixelFormatTypes.first {
+            if wantRAW, let rawFormat = proRAWFormats.first ?? bayerFormats.first ?? self.photoOutput.availableRawPhotoPixelFormatTypes.first {
                 let processedCodec = self.photoOutput.availablePhotoCodecTypes.contains(.hevc) ? AVVideoCodecType.hevc : AVVideoCodecType.jpeg
                 settings = AVCapturePhotoSettings(
                     rawPixelFormatType: rawFormat,
                     processedFormat: [AVVideoCodecKey: processedCodec]
                 )
-                settings.photoQualityPrioritization = .speed
+                settings.photoQualityPrioritization = self.photoOutput.maxPhotoQualityPrioritization
                 self.photoOutput.maxPhotoDimensions = self.max12MPDimension
                 settings.maxPhotoDimensions = self.max12MPDimension
             } else {
@@ -1918,14 +1902,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
             return
         }
         
-        var measuredTemp: Float = 0.0
-        var measuredTint: Float = 0.0
-        if let dev = self.currentDevice {
-            let tt = dev.temperatureAndTintValues(for: dev.deviceWhiteBalanceGains)
-            measuredTemp = tt.temperature
-            measuredTint = tt.tint
-        }
-        
         let wasRAW = photo.isRawPhoto
         let photoMeta = photo.metadata
         let primaryProfile = self.selectedProfile
@@ -1955,8 +1931,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
                     data: data,
                     rawMetadata: photoMeta,
                     wasCapturedAsRAW: wasRAW,
-                    wbTemp: measuredTemp,
-                    wbTint: measuredTint,
                     profile: secondaryProfile,
                     params: secondaryProfile.recommended,
                     filterEnabled: secondaryProfile != .normalClean,
@@ -1978,8 +1952,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
                 data: data,
                 rawMetadata: photoMeta,
                 wasCapturedAsRAW: wasRAW,
-                wbTemp: measuredTemp,
-                wbTint: measuredTint,
                 profile: primaryProfile,
                 params: primaryParams,
                 filterEnabled: filterOn,
@@ -3116,7 +3088,9 @@ struct ContentView: View {
     @State private var importedPhotoData: Data?
     @State private var showDarkroom = false
     @State private var showSavePresetAlert = false
+    @State private var showImportPresetAlert = false
     @State private var newPresetName = ""
+    @State private var importCodeText = ""
     
     private let zoomLevels: [CGFloat] = [0.5, 1.0, 2.0, 3.0]
     
@@ -3152,11 +3126,27 @@ struct ContentView: View {
                 camera.saveCurrentAsCustomPreset(name: newPresetName)
                 newPresetName = ""
             }
+            Button("Importar Código de Amigo...") {
+                newPresetName = ""
+                showImportPresetAlert = true
+            }
             Button("Cancelar", role: .cancel) {
                 newPresetName = ""
             }
         } message: {
-            Text("Aparecerá al final de la lista de cámaras y se conservará entre sesiones.")
+            Text("Aparecerá al final de la lista de cámaras y podrás compartirla por código con tus amigos.")
+        }
+        .alert("Importar Custom Camera", isPresented: $showImportPresetAlert) {
+            TextField("Pega el código OCAM:...", text: $importCodeText)
+            Button("Importar") {
+                let _ = camera.importCustomPresetFromCode(importCodeText)
+                importCodeText = ""
+            }
+            Button("Cancelar", role: .cancel) {
+                importCodeText = ""
+            }
+        } message: {
+            Text("Pega aquí el código OCAM:... que te haya compartido un amigo.")
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             guard let item = newItem else { return }
@@ -3389,7 +3379,7 @@ struct ContentView: View {
                     if let pt = camera.focusPoint {
                         VStack(spacing: 4) {
                             if camera.isAEAFLocked {
-                                Text("AE/AF LOCK")
+                                Text("AE/AF/WB LOCK")
                                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                                     .foregroundStyle(.black)
                                     .padding(.horizontal, 5)
@@ -4018,6 +4008,9 @@ struct ContentView: View {
                     Button("Guardar como Custom Camera...", systemImage: "folder.badge.plus") {
                         showSavePresetAlert = true
                     }
+                    Button("Importar Código de Amigo...", systemImage: "qrcode") {
+                        showImportPresetAlert = true
+                    }
                     Button("Por defecto (Sin Filtro)", systemImage: "arrow.counterclockwise") {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         camera.resetToNeutral()
@@ -4139,7 +4132,7 @@ struct ContentView: View {
         .padding(.horizontal, 24)
     }
     
-    // MARK: - Carrusel Único con Custom Cameras al Final
+    // MARK: - Carrusel Único con Custom Cameras al Final y Opción de Compartir por Código
     private var filmCarouselView: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -4202,6 +4195,15 @@ struct ContentView: View {
                         )
                     }
                     .contextMenu {
+                        Button {
+                            if let code = preset.exportShareCode() {
+                                UIPasteboard.general.string = code
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            }
+                        } label: {
+                            Label("Copiar Código para Amigos", systemImage: "doc.on.doc")
+                        }
+                        
                         Button(role: .destructive) {
                             camera.deleteCustomPreset(preset)
                         } label: {
