@@ -60,7 +60,6 @@ struct CustomCameraPreset: Codable, Identifiable, Equatable {
     var baseProfileRawValue: String
     var params: FilmLookParameters
     
-    /// Genera un código compacto en Base64 para compartir la Custom Camera por WhatsApp con amigos
     func exportShareCode() -> String? {
         guard let data = try? JSONEncoder().encode(self) else { return nil }
         return "OCAM:" + data.base64EncodedString()
@@ -412,7 +411,7 @@ class CinematicPipeline {
     
     let ciContext = CIContext(options: [
         .workingColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
-        .workingFormat: CIFormat.RGBA16, // Precisión de 16 bits por canal para evitar posterización y bandas de color en RAW
+        .workingFormat: CIFormat.RGBA8,
         .cacheIntermediates: false,
         .priorityRequestLow: false
     ])
@@ -488,8 +487,6 @@ class CinematicPipeline {
         let extent = current.extent
         guard extent.width > 0, extent.height > 0 else { return input }
         let scaleMultiplier = max(1.0, min(extent.width, extent.height) / 1080.0)
-        
-        // CERO máscaras radiales artificiales sobre RAW: CIRAWFilter ya entrega el balance de blancos y sombreado de lente oficial del DNG.
         
         if actionPanEnabled && actionPanIntensity > 0.04 {
             current = applyActionPanningEffect(
@@ -1024,8 +1021,6 @@ class CinematicPipeline {
         data: Data,
         rawMetadata: [String: Any]?,
         wasCapturedAsRAW: Bool,
-        wbTemp: Float = 0.0,
-        wbTint: Float = 0.0,
         profile: FilmProfile,
         params: FilmLookParameters,
         filterEnabled: Bool = true,
@@ -1059,8 +1054,7 @@ class CinematicPipeline {
         }
         
         // DECODIFICACIÓN DNG/RAW CALIBRADA OFICIAL DE APPLE:
-        // NO tocamos neutralTemperature ni neutralTint para que CIRAWFilter utilice la matriz AsShotNeutral y OpcodeList3 exacta grabada por el ISP en el DNG.
-        // Esto elimina el 100% del verde en el centro y el rosa en las esquinas.
+        // No sobreescribimos neutralTemperature ni neutralTint para respetar AsShotNeutral y OpcodeList3 nativos del DNG.
         if wasCapturedAsRAW && !isFromGallery, let rawFilter = CIRAWFilter(imageData: data, identifierHint: nil) {
             rawFilter.isLensCorrectionEnabled = true
             rawFilter.isGamutMappingEnabled = true
@@ -1154,7 +1148,7 @@ class CinematicPipeline {
     }
 }
 
-// MARK: - 4. Controlador de Hardware oCam
+// MARK: - 4. Controlador de Hardware oCam (Blindado contra Crashes en RAW y Super 8)
 @Observable
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
     let session = AVCaptureSession()
@@ -1650,6 +1644,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         }
     }
     
+    // MARK: - Grabación Segura de Video Corto "Super 8 / 16mm" (Sin Crashes al Mantener Presionado desde 48MP)
     func toggleSuper8Recording() {
         if isRecordingSuper8 {
             stopSuper8Recording()
@@ -1678,33 +1673,46 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
         
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("oCam_Super8_\(UUID().uuidString).mov")
         sessionQueue.async {
-            if let dev = self.currentDevice {
-                self.session.beginConfiguration()
-                if self.session.canSetSessionPreset(.high) {
-                    self.session.sessionPreset = .high
+            guard let dev = self.currentDevice else {
+                DispatchQueue.main.async {
+                    self.isRecordingSuper8 = false
+                    self.super8Timer?.invalidate()
                 }
-                self.session.commitConfiguration()
-                
-                do {
-                    try dev.lockForConfiguration()
-                    let fps18 = CMTimeMake(value: 1, timescale: 18)
-                    for range in dev.activeFormat.videoSupportedFrameRateRanges {
-                        if range.minFrameRate <= 18.0 && range.maxFrameRate >= 18.0 {
-                            dev.activeVideoMinFrameDuration = fps18
-                            dev.activeVideoMaxFrameDuration = fps18
-                            break
-                        }
-                    }
-                    dev.unlockForConfiguration()
-                } catch {}
+                return
             }
-            if let conn = self.movieOutput.connection(with: .video), conn.isActive {
+            
+            // CRÍTICO: Si el sensor estaba en formato de 48MP (.inputPriority), pasarlo primero a .photo (12MP)
+            // de forma limpia antes de iniciar movieOutput, porque el formato de 48MP crashea startRecording()
+            if self.session.sessionPreset == .inputPriority {
+                self.session.beginConfiguration()
+                if self.session.canSetSessionPreset(.photo) {
+                    self.session.sessionPreset = .photo
+                }
+                self.photoOutput.maxPhotoDimensions = self.max12MPDimension
+                self.session.commitConfiguration()
+            }
+            
+            do {
+                try dev.lockForConfiguration()
+                let fps18 = CMTimeMake(value: 1, timescale: 18)
+                for range in dev.activeFormat.videoSupportedFrameRateRanges {
+                    if range.minFrameRate <= 18.0 && range.maxFrameRate >= 18.0 {
+                        dev.activeVideoMinFrameDuration = fps18
+                        dev.activeVideoMaxFrameDuration = fps18
+                        break
+                    }
+                }
+                dev.unlockForConfiguration()
+            } catch {}
+            
+            if let conn = self.movieOutput.connection(with: .video), conn.isEnabled, conn.isActive, !self.movieOutput.isRecording {
                 self.movieOutput.startRecording(to: tempURL, recordingDelegate: self)
             } else {
                 DispatchQueue.main.async {
                     self.isRecordingSuper8 = false
                     self.super8Timer?.invalidate()
-                    self.statusMessage = "VIDEO NO DISPONIBLE"
+                    self.statusMessage = "LISTO"
+                    self.updateStatusBadge()
                 }
             }
         }
@@ -1725,12 +1733,14 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
     }
     
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        let want48 = use48MPMode && is48MPSupported && (currentZoom == 1.0)
+        let want48 = use48MPMode && is48MPSupported && (currentZoom == 1.0) && !super8ModeEnabled
+        let targetEV = params.cameraBiasEV
         sessionQueue.async {
             if let dev = self.currentDevice {
                 self.session.beginConfiguration()
                 self.configureSensorFormat(for: dev, prefer48MP: want48)
                 self.session.commitConfiguration()
+                self.applyExposureInternal(targetEV)
             }
         }
         
@@ -1792,7 +1802,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
     }
     
     func triggerShutter() {
-        if super8ModeEnabled {
+        if super8ModeEnabled || isRecordingSuper8 {
             toggleSuper8Recording()
             return
         }
@@ -1817,7 +1827,7 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
     }
     
     func capturePhoto() {
-        guard !isProcessing else { return }
+        guard !isProcessing && !isRecordingSuper8 else { return }
         isProcessing = true
         
         let want48MP = self.use48MPMode && self.is48MPSupported && (self.currentZoom == 1.0)
@@ -1836,7 +1846,6 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
             }
             
             let settings: AVCapturePhotoSettings
-            // Priorizar Apple ProRAW (que incluye calibración ISP multi-cuadro sin manchas verdes ni esquinas rosas) sobre Bayer RAW crudo
             let proRAWFormats = self.photoOutput.availableRawPhotoPixelFormatTypes.filter {
                 AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
             }
@@ -1845,12 +1854,15 @@ class CameraManager: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutpu
             }
             
             if wantRAW, let rawFormat = proRAWFormats.first ?? bayerFormats.first ?? self.photoOutput.availableRawPhotoPixelFormatTypes.first {
+                let isProRAW = AVCapturePhotoOutput.isAppleProRAWPixelFormat(rawFormat)
                 let processedCodec = self.photoOutput.availablePhotoCodecTypes.contains(.hevc) ? AVVideoCodecType.hevc : AVVideoCodecType.jpeg
                 settings = AVCapturePhotoSettings(
                     rawPixelFormatType: rawFormat,
                     processedFormat: [AVVideoCodecKey: processedCodec]
                 )
-                settings.photoQualityPrioritization = self.photoOutput.maxPhotoQualityPrioritization
+                // CRÍTICO ANTI-CRASH: Bayer RAW exige OBLIGATORIAMENTE .speed en iOS cuando va acompañado de processedFormat.
+                // Si se le pasa .quality o .balanced, AVCapturePhotoOutput lanza NSInvalidArgumentException y cierra la app.
+                settings.photoQualityPrioritization = isProRAW ? self.photoOutput.maxPhotoQualityPrioritization : .speed
                 self.photoOutput.maxPhotoDimensions = self.max12MPDimension
                 settings.maxPhotoDimensions = self.max12MPDimension
             } else {
@@ -4120,7 +4132,7 @@ struct ContentView: View {
                     
                     glassSliderRow(title: "POLVO/RAYAS", value: $camera.params.dustAndScratches, range: 0.0...1.0, text: "\(Int(camera.params.dustAndScratches * 100))%")
                     
-                    glassSliderRow(title: "FILM BURN", value: $camera.params.filmBurnAmount, range: 0.0...1.0, text: "\(Int(camera.params.filmBurnAmount * 100))%")
+                    glassSliderRow(title: "FILM BURN", value: $camera.params.filmBurnAmount, range: 0.0...1.0, format: "\(Int(camera.params.filmBurnAmount * 100))%")
                 }
             }
         }
