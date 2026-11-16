@@ -4132,7 +4132,7 @@ struct ContentView: View {
                     
                     glassSliderRow(title: "POLVO/RAYAS", value: $camera.params.dustAndScratches, range: 0.0...1.0, text: "\(Int(camera.params.dustAndScratches * 100))%")
                     
-                    glassSliderRow(title: "FILM BURN", value: $camera.params.filmBurnAmount, range: 0.0...1.0, format: "\(Int(camera.params.filmBurnAmount * 100))%")
+                    glassSliderRow(title: "FILM BURN", value: $camera.params.filmBurnAmount, range: 0.0...1.0, text: "\(Int(camera.params.filmBurnAmount * 100))%")
                 }
             }
         }
